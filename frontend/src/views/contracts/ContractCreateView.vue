@@ -1,315 +1,323 @@
 <template>
   <div class="page">
-    <div class="page-title">新增合同</div>
-
-    <div class="hint">
-      校验规则（按需求落地）：<br />
-      1）必填项缺失不允许保存；2）合同金额与支付总金额必须一致；3）合同名称不允许重复；4）合同附件三类均必填。
+    <div class="page-header">
+      <h2 class="page-title">创建合同</h2>
+      <el-button :icon="ArrowLeft" @click="$router.push('/contracts/list')">返回列表</el-button>
     </div>
 
-    <div class="card">
-      <h3 class="section">1. 基础信息</h3>
-      <div class="grid">
-        <div class="field">
-          <label>合同名称 <span class="req">*</span></label>
-          <input v-model="form.contractName" placeholder="例如：星河-软件服务合同-2026" />
+    <el-card class="form-card" shadow="never">
+      <template #header>
+        <div class="card-title">
+          <el-icon><Document /></el-icon>
+          合同基本信息
+          <span class="card-meta">— 合同名称需全局唯一,合同金额必须等于付款节点之和</span>
         </div>
-        <div class="field">
-          <label>客户名称 <span class="req">*</span></label>
-          <select v-model="form.customerId">
-            <option value="">请选择客户</option>
-            <option v-for="c in customers" :key="c.id" :value="c.id">{{ c.customerName }}</option>
-          </select>
-        </div>
-      </div>
+      </template>
 
-      <h3 class="section">2. 合同类型与金额</h3>
-      <div class="grid">
-        <div class="field">
-          <label>合同类型 <span class="req">*</span></label>
-          <select v-model="form.contractType">
-            <option value="">请选择合同类型</option>
-            <option value="软件服务">软件服务</option>
-            <option value="交付">交付</option>
-            <option value="咨询服务">咨询服务</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>合同金额（应与支付总金额一致） <span class="req">*</span></label>
-          <input v-model.number="form.contractAmount" type="number" placeholder="例如：120000" />
-        </div>
-      </div>
+      <el-form :model="form" label-position="top">
+        <el-row :gutter="16">
+          <el-col :xs="24" :md="12">
+            <el-form-item label="合同名称" required>
+              <el-input v-model="form.contractName" placeholder="请输入合同名称(全局唯一)" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="12">
+            <el-form-item label="客户" required>
+              <el-select
+                v-model="form.customerId"
+                placeholder="请选择客户"
+                filterable
+                style="width: 100%"
+                :loading="customerLoading"
+              >
+                <el-option v-for="c in customers" :key="c.id" :label="c.customerName" :value="c.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="8">
+            <el-form-item label="合同类型">
+              <el-select v-model="form.contractType" placeholder="选择类型" clearable style="width: 100%">
+                <el-option label="服务合同" value="服务合同" />
+                <el-option label="产品销售" value="产品销售" />
+                <el-option label="解决方案" value="解决方案" />
+                <el-option label="运维服务" value="运维服务" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="8">
+            <el-form-item label="合同年份" required>
+              <el-input-number v-model="form.contractYear" :min="2019" :max="2099" controls-position="right" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :md="8">
+            <el-form-item label="合同总金额(元)" required>
+              <el-input-number v-model="form.totalAmount" :min="0" :step="10000" :precision="2" controls-position="right" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24">
+            <el-form-item label="合同正文附件">
+              <el-upload
+                :http-request="customUpload"
+                :before-upload="beforeUpload"
+                :show-file-list="false"
+                accept=".pdf,.doc,.docx"
+              >
+                <el-button :icon="Upload" :loading="uploading">选择文件上传</el-button>
+                <template #tip>
+                  <div class="upload-tip">
+                    <span v-if="form.fileUrl" class="uploaded">
+                      已上传:
+                      <el-link :href="form.fileUrl" target="_blank" type="primary">{{ uploadedName || form.fileUrl }}</el-link>
+                      <el-button :icon="Delete" link type="danger" size="small" @click="clearUpload">移除</el-button>
+                    </span>
+                    <span v-else class="upload-hint">
+                      推荐 PDF / DOCX,单文件 ≤ 20MB
+                    </span>
+                  </div>
+                </template>
+              </el-upload>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+    </el-card>
 
-      <h3 class="section">3. 支付信息</h3>
-      <div class="grid">
-        <div class="field">
-          <label>支付总金额（应与合同金额一致） <span class="req">*</span></label>
-          <input v-model.number="form.paymentTotal" type="number" placeholder="例如：120000" />
+    <el-card class="form-card" shadow="never">
+      <template #header>
+        <div class="card-title">
+          <el-icon><Money /></el-icon>
+          付款节点
+          <span class="card-meta">— 已配置 {{ form.paymentNodes.length }} 个,合计 {{ formatMoney(nodesSum) }} <span :class="amountMatchClass">/ {{ formatMoney(form.totalAmount) }}</span></span>
         </div>
-        <div class="field">
-          <label>备注</label>
-          <input v-model="form.note" placeholder="可选" />
-        </div>
-      </div>
+      </template>
 
-      <h3 class="section">4. 合同附件</h3>
-      <div class="upload-grid">
-        <div class="upload-item">
-          <label>合同正文（必填）<span class="req">*</span></label>
-          <input type="file" @change="onFile($event, 'contractBody')" />
-          <div class="file-meta">{{ form.attachments.contractBody || '未上传' }}</div>
-        </div>
-        <div class="upload-item">
-          <label>毛利率分析表（必填）<span class="req">*</span></label>
-          <input type="file" @change="onFile($event, 'grossMarginTable')" />
-          <div class="file-meta">{{ form.attachments.grossMarginTable || '未上传' }}</div>
-        </div>
-        <div class="upload-item">
-          <label>价格清单表（必填）<span class="req">*</span></label>
-          <input type="file" @change="onFile($event, 'priceListTable')" />
-          <div class="file-meta">{{ form.attachments.priceListTable || '未上传' }}</div>
-        </div>
-      </div>
+      <el-table :data="form.paymentNodes" stripe>
+        <el-table-column label="节点名称" min-width="180">
+          <template #default="{ row }">
+            <el-input v-model="row.nodeName" placeholder="例如:首付款" />
+          </template>
+        </el-table-column>
+        <el-table-column label="计划金额(元)" width="200">
+          <template #default="{ row }">
+            <el-input-number v-model="row.planAmount" :min="0" :step="1000" :precision="2" controls-position="right" style="width: 100%" />
+          </template>
+        </el-table-column>
+        <el-table-column label="计划日期" width="180">
+          <template #default="{ row }">
+            <el-date-picker v-model="row.planDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80" fixed="right">
+          <template #default="{ $index }">
+            <el-button type="danger" :icon="Delete" size="small" circle @click="removeNode($index)" />
+          </template>
+        </el-table-column>
+      </el-table>
 
-      <div class="footer-actions">
-        <button class="btn" type="button" @click="goBack">返回</button>
-        <button class="btn btn-primary" type="button" @click="save">保存</button>
+      <div class="add-node-row">
+        <el-button :icon="Plus" @click="addNode">新增付款节点</el-button>
       </div>
+    </el-card>
 
-      <div v-if="message" class="message" :class="{ error: messageType === 'error' }">{{ message }}</div>
+    <div class="footer-actions">
+      <el-button @click="$router.push('/contracts/list')">取消</el-button>
+      <el-button type="primary" :icon="Check" :loading="submitting" @click="submit">保存合同</el-button>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, reactive, ref } from 'vue'
+import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMockStore } from '@/store/mockStore'
-
-type AttachmentKey = 'contractBody' | 'grossMarginTable' | 'priceListTable'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft, Document, Money, Plus, Delete, Check, Upload } from '@element-plus/icons-vue'
+import { contractApi, formatMoney, PaymentNodeRequest } from '@/api/contract'
+import { customerApi, Customer } from '@/api/customer'
 
 export default defineComponent({
   name: 'ContractCreateView',
   setup() {
-    const store = useMockStore()
     const router = useRouter()
 
-    const customers = computed(() => store.customers)
-
-    const message = ref('')
-    const messageType = ref<'error' | 'success'>('success')
+    const customers = ref<Customer[]>([])
+    const customerLoading = ref(false)
 
     const form = reactive({
       contractName: '',
-      customerId: '',
+      customerId: undefined as number | undefined,
       contractType: '',
-      contractAmount: 0,
-      paymentTotal: 0,
-      note: '',
-      attachments: {
-        contractBody: '',
-        grossMarginTable: '',
-        priceListTable: '',
-      } as Record<AttachmentKey, string>,
+      contractYear: new Date().getFullYear(),
+      totalAmount: 0,
+      fileUrl: '',
+      paymentNodes: [] as PaymentNodeRequest[],
     })
 
-    const onFile = (evt: Event, key: AttachmentKey) => {
-      const input = evt.target as HTMLInputElement
-      const file = input.files?.[0]
-      form.attachments[key] = file ? file.name : ''
+    const submitting = ref(false)
+
+    /** 文件上传(POST /files/upload, OPP_ADMIN) */
+    const uploading = ref(false)
+    const uploadedName = ref('')
+    const beforeUpload = (file: File): boolean => {
+      if (file.size > 20 * 1024 * 1024) {
+        ElMessage.error('文件不可超过 20MB')
+        return false
+      }
+      return true
+    }
+    const customUpload = async ({ file }: { file: File }) => {
+      uploading.value = true
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('category', 'contracts')
+        const token = window.localStorage.getItem('auth_token') || ''
+        const res = await fetch('/api/files/upload', {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: fd,
+        })
+        const body = await res.json()
+        if (res.status === 401 || res.status === 403) {
+          ElMessage.error('未登录或无权上传(仅 OPP_ADMIN)')
+          return
+        }
+        if (body.code !== 200) {
+          ElMessage.error(body.message || '上传失败')
+          return
+        }
+        form.fileUrl = body.data.url
+        uploadedName.value = body.data.originalName
+        ElMessage.success('上传成功')
+      } catch (e: any) {
+        ElMessage.error(e?.message || '上传失败')
+      } finally {
+        uploading.value = false
+      }
+    }
+    const clearUpload = () => {
+      form.fileUrl = ''
+      uploadedName.value = ''
     }
 
-    const goBack = () => router.push({ path: '/contracts/list' })
-
-    const save = () => {
-      // 必填校验
-      if (!form.contractName || !form.customerId || !form.contractType) {
-        messageType.value = 'error'
-        message.value = '请填写合同名称、客户名称、合同类型'
-        return
+    const loadCustomers = async () => {
+      customerLoading.value = true
+      try {
+        const res = await customerApi.list({ page: 1, size: 200 })
+        customers.value = res.records || []
+      } catch (e: any) {
+        ElMessage.error(e?.message || '加载客户列表失败')
+        customers.value = []
+      } finally {
+        customerLoading.value = false
       }
-      if (!form.contractAmount || !form.paymentTotal) {
-        messageType.value = 'error'
-        message.value = '请填写合同金额与支付总金额'
-        return
-      }
-      if (!form.attachments.contractBody || !form.attachments.grossMarginTable || !form.attachments.priceListTable) {
-        messageType.value = 'error'
-        message.value = '请上传合同正文、毛利率分析表、价格清单表（均为必填）'
-        return
-      }
-
-      // 唯一性校验：合同名称不重复
-      const dup = store.contracts.some((c) => c.contractName === form.contractName)
-      if (dup) {
-        messageType.value = 'error'
-        message.value = '合同名称重复：请更换后再保存'
-        return
-      }
-
-      // 金额一致性
-      if (Number(form.contractAmount) !== Number(form.paymentTotal)) {
-        messageType.value = 'error'
-        message.value = '合同金额与支付总金额必须一致'
-        return
-      }
-
-      const amount = Number(form.contractAmount)
-      const node1 = Math.round(amount * 0.5)
-      const node2 = amount - node1
-
-      store.contracts.push({
-        id: `ct_${Date.now()}`,
-        contractName: form.contractName,
-        customerId: form.customerId,
-        contractType: form.contractType,
-        contractAmount: amount,
-        paymentTotal: Number(form.paymentTotal),
-        status: '执行中',
-        createdAt: new Date().toISOString(),
-        attachments: {
-          contractBody: form.attachments.contractBody,
-          grossMarginTable: form.attachments.grossMarginTable,
-          priceListTable: form.attachments.priceListTable,
-        },
-        paymentNodes: [
-          { id: `pn_${Date.now()}_1`, nodeName: '首付款', amount: node1, dueAt: '', paidAt: '' },
-          { id: `pn_${Date.now()}_2`, nodeName: '尾款', amount: node2, dueAt: '', paidAt: '' },
-        ],
-      })
-
-      messageType.value = 'success'
-      message.value = '保存成功：合同已创建（状态=执行中）'
-      setTimeout(() => router.push({ path: '/contracts/list' }), 400)
     }
+
+    const addNode = () => {
+      form.paymentNodes.push({ nodeName: '', planAmount: 0, planDate: undefined })
+    }
+    const removeNode = (idx: number) => {
+      form.paymentNodes.splice(idx, 1)
+    }
+
+    const nodesSum = computed(() => form.paymentNodes.reduce((s, n) => s + Number(n.planAmount || 0), 0))
+    const amountMatch = computed(() => Math.abs(nodesSum.value - Number(form.totalAmount || 0)) < 0.01)
+    const amountMatchClass = computed(() => amountMatch.value ? 'text-success' : 'text-error')
+
+    const submit = async () => {
+      if (!form.contractName.trim()) {
+        ElMessage.error('请填写合同名称')
+        return
+      }
+      if (!form.customerId) {
+        ElMessage.error('请选择客户')
+        return
+      }
+      if (!form.totalAmount || form.totalAmount <= 0) {
+        ElMessage.error('请填写合同金额')
+        return
+      }
+      if (form.paymentNodes.length === 0) {
+        ElMessage.error('至少添加一个付款节点')
+        return
+      }
+      for (const n of form.paymentNodes) {
+        if (!n.nodeName || !n.nodeName.trim()) {
+          ElMessage.error('付款节点名称必填')
+          return
+        }
+        if (!n.planAmount || n.planAmount <= 0) {
+          ElMessage.error('付款节点金额必须大于 0')
+          return
+        }
+      }
+      if (!amountMatch.value) {
+        ElMessage.error(`付款节点之和(${formatMoney(nodesSum.value)})必须等于合同总额(${formatMoney(form.totalAmount)})`)
+        return
+      }
+
+      submitting.value = true
+      try {
+        await contractApi.create({
+          contractName: form.contractName.trim(),
+          customerId: form.customerId,
+          contractType: form.contractType || undefined,
+          contractYear: form.contractYear,
+          totalAmount: form.totalAmount,
+          fileUrl: form.fileUrl || undefined,
+          paymentNodes: form.paymentNodes,
+        })
+        ElMessage.success('合同创建成功')
+        setTimeout(() => router.push('/contracts/list'), 400)
+      } catch (e: any) {
+        ElMessage.error(e?.message || '创建失败')
+      } finally {
+        submitting.value = false
+      }
+    }
+
+    onMounted(() => {
+      loadCustomers()
+      addNode()
+    })
 
     return {
-      customers,
-      form,
-      onFile,
-      save,
-      goBack,
-      message,
-      messageType,
+      customers, customerLoading,
+      form, submitting,
+      nodesSum, amountMatch, amountMatchClass,
+      uploading, uploadedName, beforeUpload, customUpload, clearUpload,
+      addNode, removeNode, submit,
+      formatMoney,
+      ArrowLeft, Document, Money, Plus, Delete, Check, Upload,
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.page-title {
-  font-weight: 800;
-  font-size: 16px;
-  margin-bottom: 6px;
+.page { max-width: 1200px; margin: 0 auto; }
+.page-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
 }
-.hint {
-  color: #475569;
-  background: #fff;
-  border: 1px dashed #cbd5e1;
-  border-radius: 14px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-  line-height: 1.7;
-  font-size: 13px;
+.page-title { font-size: 18px; font-weight: 600; color: #0F172A; margin: 0; }
+.form-card {
+  border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 16px;
+  :deep(.el-card__header) { padding: 14px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
+  :deep(.el-card__body) { padding: 20px; }
+  :deep(.el-table th.el-table__cell) {
+    background: #F8FAFC !important; color: #0F172A; font-weight: 600; font-size: 13px;
+  }
 }
-.card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 14px;
-}
-.section {
-  font-weight: 900;
-  font-size: 13px;
-  margin: 14px 0 10px;
-}
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.field label {
-  font-size: 12px;
-  color: #334155;
-}
-.field input,
-.field select {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  height: 36px;
-  padding: 0 10px;
-}
-.req {
-  color: #ef4444;
-  font-weight: 700;
-}
-.upload-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-.upload-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 12px;
-  background: #f8fafc;
-}
-.upload-item label {
-  display: block;
-  font-size: 12px;
-  color: #334155;
-  margin-bottom: 8px;
-}
-.file-meta {
-  margin-top: 8px;
-  color: #475569;
-  font-size: 13px;
-}
+.card-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: #0F172A; }
+.card-meta { color: #64748B; font-weight: 400; font-size: 13px; }
+.add-node-row { padding: 12px; }
 .footer-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 14px;
+  display: flex; justify-content: flex-end; gap: 12px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid #E2E8F0;
 }
-.btn {
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  border-radius: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.btn-primary {
-  background: #0369a1;
-  color: #fff;
-  border-color: #0369a1;
-}
-.message {
-  margin-top: 12px;
-  border-radius: 12px;
-  padding: 10px 12px;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  color: #334155;
-}
-.message.error {
-  border-color: #fca5a5;
-  background: #fff1f2;
-  color: #b91c1c;
-}
-
-@media (max-width: 980px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
-  .upload-grid {
-    grid-template-columns: 1fr;
-  }
+.text-success { color: #059669; font-weight: 600; }
+.text-error { color: #DC2626; font-weight: 600; }
+:deep(.el-button--primary) {
+  background-color: #0369A1; border-color: #0369A1;
+  &:hover { background-color: #0284C7; border-color: #0284C7; }
 }
 </style>
-
