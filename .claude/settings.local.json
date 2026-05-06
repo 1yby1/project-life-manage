@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vite *)",
+      "Bash(echo \"---EXIT $?---\")",
+      "Bash(./mvnw -DskipTests compile)",
+      "Bash(mkdir -p /tmp/copy-fix)",
+      "Bash(agent-browser open *)",
+      "Bash(agent-browser wait *)",
+      "Bash(agent-browser snapshot *)",
+      "Bash(agent-browser fill *)",
+      "Bash(agent-browser press *)",
+      "Bash(agent-browser get *)",
+      "Bash(agent-browser screenshot *)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"frontend: %{http_code}\\\\n\" http://localhost:8081/)",
+      "Bash(curl -s -o /dev/null -w \"backend: %{http_code}\\\\n\" http://localhost:8080/auth/me)",
+      "Bash(python \"C:/Users/yby/.claude/skills/ui-ux-pro-max/scripts/search.py\" \"B2B CRM admin panel professional minimal sidebar navigation enterprise dashboard\" --design-system -p \"项目全生命周期管理系统\" -f markdown)",
+      "Bash(python \"C:/Users/yby/.claude/skills/ui-ux-pro-max/scripts/search.py\" \"sidebar navigation menu collapse hierarchy\" --domain ux)"
+    ]
+  }
+}

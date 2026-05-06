@@ -1,0 +1,76 @@
+# ============================================================================
+# 项目全生命周期管理系统 — 一键启动
+# ============================================================================
+# 用法:
+#   docker compose up -d        # 启动(首次会构建镜像 + 初始化 DB,约 3-5 分钟)
+#   docker compose logs -f      # 跟踪日志
+#   docker compose down         # 停服(数据保留)
+#   docker compose down -v      # 停服并删数据卷(下次首次启动重新初始化 DB)
+#
+# 启动后:
+#   前端: http://localhost:8081
+#   后端: http://localhost:8080(可选,正常通过前端 nginx 反代)
+#   MySQL: localhost:3306(可选,密码 123456)
+# ============================================================================
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: projectlife-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: projectlife
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 仅挂 schema.sql,避开同目录的 migration_*.sql(避免重复 ALTER 报错)
+      - ./backend/src/main/resources/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p123456"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: projectlife-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Spring Boot 自动从环境变量覆盖 application.yml
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/projectlife?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai"
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: "123456"
+      # 文件上传根目录映射到容器内 /app/uploads,通过 volume 持久化到主机
+      APP_UPLOAD_BASE_DIR: /app/uploads
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend-uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: projectlife-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+
+volumes:
+  mysql-data:
+  backend-uploads:

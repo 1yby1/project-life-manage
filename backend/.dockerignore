@@ -1,0 +1,21 @@
+# 不拷进 docker build context 的文件
+target/
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.settings/
+.classpath
+.project
+.factorypath
+HELP.md
+CLAUDE.md
+
+# 不要把宿主上传文件带进镜像;运行时由 docker-compose volume 挂入
+uploads/
+
+# git 元数据
+.git/
+.gitignore
+.gitattributes

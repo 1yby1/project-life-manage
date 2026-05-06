@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.idea/
+.vscode/
+.gemini/
+.claude/
+.github/
+
+# 临时脚本(早期开发用)
+fix.py
+fix2.py
+
+# git 元数据
+.git/
+.gitignore
+.gitattributes
+
+CLAUDE.md

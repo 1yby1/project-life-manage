@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### 用户上传(合同附件等) ###
+uploads/
