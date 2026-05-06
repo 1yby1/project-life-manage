@@ -1,326 +1,274 @@
 <template>
   <div class="page">
-    <div class="page-title">线索培育（转商机）</div>
-    <div class="subhint">完善项目、人员、客户关键人全量信息（演示：必填校验通过后生成商机并进入“模板选择”）。</div>
-
-    <div v-if="!clue" class="empty">未找到线索</div>
-
-    <div v-else class="card">
-      <div class="summary">
-        <div class="summary-item">
-          <span class="label">线索名称</span>
-          <span class="value">{{ clue.clueName }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="label">客户</span>
-          <span class="value">{{ clue.customerName || '-' }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="label">当前阶段</span>
-          <span class="value">{{ clue.stage }}</span>
-        </div>
-      </div>
-
-      <h3 class="section-title">1. 项目信息（必填）</h3>
-      <div class="grid">
-        <div class="field">
-          <label>项目名称 <span class="req">*</span></label>
-          <input v-model="form.projectName" />
-        </div>
-        <div class="field">
-          <label>预计采购时间 <span class="req">*</span></label>
-          <input v-model="form.expectedPurchaseTime" placeholder="例如：2026-04" />
-        </div>
-        <div class="field">
-          <label>签约概率（0~1） <span class="req">*</span></label>
-          <input v-model.number="form.signingProbability" type="number" step="0.01" />
-        </div>
-        <div class="field">
-          <label>预测金额 <span class="req">*</span></label>
-          <input v-model.number="form.predictedAmount" type="number" />
-        </div>
-        <div class="field">
-          <label>线索等级 <span class="req">*</span></label>
-          <select v-model="form.clueLevel">
-            <option value="">请选择</option>
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
-          </select>
-        </div>
-      </div>
-
-      <h3 class="section-title">2. 人员与关键联系人（必填）</h3>
-      <div class="grid">
-        <div class="field">
-          <label>解决方案经理 <span class="req">*</span></label>
-          <input v-model="form.solutionManager" placeholder="例如：张方案" />
-        </div>
-        <div class="field">
-          <label>商机负责人（项目经理） <span class="req">*</span></label>
-          <select v-model="form.opportunityOwnerId">
-            <option value="">请选择负责人</option>
-            <option v-for="e in projectManagers" :key="e.id" :value="e.id">{{ e.name }}（{{ e.dept }}）</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>客户关键人姓名 <span class="req">*</span></label>
-          <input v-model="form.keyContact.name" />
-        </div>
-        <div class="field">
-          <label>客户关键人职位 <span class="req">*</span></label>
-          <input v-model="form.keyContact.title" />
-        </div>
-        <div class="field">
-          <label>客户关键人联系方式 <span class="req">*</span></label>
-          <input v-model="form.keyContact.phone" />
-        </div>
-      </div>
-
-      <div class="footer-actions">
-        <button class="btn" type="button" @click="goBack">返回线索清单</button>
-        <button class="btn btn-primary" type="button" @click="toTemplateSelect">完善后转商机</button>
-      </div>
-
-      <div v-if="message" class="message" :class="{ error: messageType === 'error' }">{{ message }}</div>
+    <div class="page-header">
+      <h2 class="page-title">线索培育</h2>
+      <el-button :icon="ArrowLeft" @click="goBack">返回列表</el-button>
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="hint-alert">
+      <template #title>
+        完善项目信息、人员与客户关键人 — 可多次「保存培育」;字段填全后点「转商机」
+      </template>
+    </el-alert>
+
+    <el-empty v-if="!loading && !lead" description="未找到线索" :image-size="100" />
+
+    <template v-else-if="lead">
+      <el-card class="summary-card" shadow="never">
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="线索名称">
+            <span class="clue-name">{{ lead.title }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="客户">{{ lead.customerName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="当前阶段">
+            <el-tag :type="leadStageTagType(lead.status)" effect="light" round>
+              {{ leadStatusToStage(lead.status) }}
+            </el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+      </el-card>
+
+      <el-alert
+        v-if="lead.status !== 'DISTRIBUTED'"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="alert-banner"
+      >
+        <template #title>当前阶段不可培育(需 DISTRIBUTED 状态)</template>
+      </el-alert>
+
+      <el-card class="form-card" shadow="never" v-loading="loading">
+        <el-form :model="form" label-position="top" :disabled="lead.status !== 'DISTRIBUTED'">
+          <div class="section-title">项目信息</div>
+          <el-row :gutter="16">
+            <el-col :xs="24" :md="12">
+              <el-form-item label="项目名称" required>
+                <el-input v-model="form.projectName" placeholder="请输入项目名称" clearable />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="预计采购时间" required>
+                <el-input v-model="form.expectedPurchaseTime" placeholder="例如:2026-04" clearable />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="签约概率(0~1)" required>
+                <el-input-number v-model="form.winRate" :min="0" :max="1" :step="0.05" :precision="2" controls-position="right" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="预测金额(元)" required>
+                <el-input-number v-model="form.predictedAmount" :min="0" :step="10000" controls-position="right" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="线索等级" required>
+                <el-select v-model="form.clueLevel" placeholder="请选择" style="width: 100%">
+                  <el-option label="A 级" value="A" />
+                  <el-option label="B 级" value="B" />
+                  <el-option label="C 级" value="C" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <div class="section-title">人员与关键联系人</div>
+          <el-row :gutter="16">
+            <el-col :xs="24" :md="12">
+              <el-form-item label="解决方案经理" required>
+                <el-input v-model="form.solutionManager" placeholder="例如:张方案" clearable />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <el-form-item label="商机负责人(项目经理)" required>
+                <el-select v-model="form.opportunityOwnerId" placeholder="请选择负责人" filterable style="width: 100%" :loading="pmLoading">
+                  <el-option v-for="p in projectManagers" :key="p.id" :label="p.realName || p.username" :value="p.id" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="8">
+              <el-form-item label="客户关键人姓名" required>
+                <el-input v-model="form.keyContact.name" clearable />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="8">
+              <el-form-item label="客户关键人职位" required>
+                <el-input v-model="form.keyContact.title" clearable />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :md="8">
+              <el-form-item label="客户关键人联系方式" required>
+                <el-input v-model="form.keyContact.phone" clearable />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <div v-if="lead.status === 'DISTRIBUTED'" class="footer-actions">
+            <el-button @click="goBack">返回</el-button>
+            <el-button :icon="Check" :loading="saving" @click="saveCultivate">保存培育</el-button>
+            <el-button type="primary" :icon="MagicStick" :loading="converting" @click="convert">
+              完善后转商机
+            </el-button>
+          </div>
+        </el-form>
+      </el-card>
+    </template>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, reactive, ref } from 'vue'
+import { defineComponent, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getEmployeeIdByRoleLabel, useMockStore } from '@/store/mockStore'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft, MagicStick, Check } from '@element-plus/icons-vue'
+import { leadApi, LeadDetail } from '@/api/lead'
+import { userApi, AdminUser } from '@/api/user'
+import {
+  parseCultivateInfo, serializeCultivateForm, EMPTY_CULTIVATE_FORM, CultivateForm,
+  leadStatusToStage, leadStageTagType,
+} from '@/utils/leadDetail'
 
 export default defineComponent({
   name: 'ClueCultivateView',
   setup() {
-    const store = useMockStore()
     const route = useRoute()
     const router = useRouter()
+    const clueId = Number(route.query.clueId || 0)
 
-    const clueId = String(route.query.clueId || '')
-    const clue = computed(() => store.clues.find((l) => l.id === clueId))
+    const lead = ref<LeadDetail | null>(null)
+    const loading = ref(false)
+    const projectManagers = ref<AdminUser[]>([])
+    const pmLoading = ref(false)
+    const saving = ref(false)
+    const converting = ref(false)
 
-    const roleLabel = window.localStorage.getItem('demo_role') || '客户经理'
-    const employeeId = getEmployeeIdByRoleLabel(roleLabel)
-
-    const projectManagers = computed(() => store.employees.filter((e) => e.roleTag === '项目经理'))
-
-    const form = reactive({
-      projectName: '',
-      expectedPurchaseTime: '',
-      signingProbability: 0.5,
-      predictedAmount: 0,
-      clueLevel: '',
-      solutionManager: '',
-      opportunityOwnerId: '',
-      keyContact: {
-        name: '',
-        title: '',
-        phone: '',
-      },
+    const form = reactive<CultivateForm>({
+      ...EMPTY_CULTIVATE_FORM,
+      keyContact: { ...EMPTY_CULTIVATE_FORM.keyContact },
     })
 
-    const message = ref('')
-    const messageType = ref<'error' | 'success'>('success')
-
     const sync = () => {
-      if (!clue.value) return
-      form.projectName = clue.value.projectName || ''
-      form.expectedPurchaseTime = clue.value.expectedPurchaseTime || ''
-      form.signingProbability = clue.value.signingProbability ?? 0.5
-      form.predictedAmount = clue.value.predictedAmount ?? 0
-      form.clueLevel = clue.value.clueLevel || ''
-      form.solutionManager = clue.value.solutionManager || ''
-      form.opportunityOwnerId = clue.value.opportunityOwnerId || ''
-      form.keyContact.name = clue.value.keyContact?.name || ''
-      form.keyContact.title = clue.value.keyContact?.title || ''
-      form.keyContact.phone = clue.value.keyContact?.phone || ''
+      const parsed = parseCultivateInfo(lead.value)
+      Object.assign(form, parsed)
+      form.keyContact = { ...parsed.keyContact }
     }
-    sync()
+
+    const loadAll = async () => {
+      if (!clueId) return
+      loading.value = true
+      pmLoading.value = true
+      try {
+        const [d, pms] = await Promise.all([
+          leadApi.detail(clueId),
+          userApi.listProjectManagers(),
+        ])
+        lead.value = d
+        projectManagers.value = pms || []
+        sync()
+      } catch (e: any) {
+        ElMessage.error(e?.message || '加载失败')
+        lead.value = null
+      } finally {
+        loading.value = false
+        pmLoading.value = false
+      }
+    }
 
     const goBack = () => router.push({ path: '/clues/list' })
 
-    const validate = () => {
+    const validate = (): string => {
       if (!form.projectName) return '请填写项目名称'
       if (!form.expectedPurchaseTime) return '请填写预计采购时间'
-      if (!(form.signingProbability >= 0 && form.signingProbability <= 1)) return '签约概率必须在 0~1 之间'
+      if (!(form.winRate >= 0 && form.winRate <= 1)) return '签约概率必须在 0~1 之间'
       if (!form.predictedAmount || form.predictedAmount <= 0) return '请填写预测金额'
       if (!form.clueLevel) return '请选择线索等级'
       if (!form.solutionManager) return '请填写解决方案经理'
-      if (!form.opportunityOwnerId) return '请选择商机负责人'
+      if (typeof form.opportunityOwnerId !== 'number') return '请选择商机负责人'
       if (!form.keyContact.name || !form.keyContact.title || !form.keyContact.phone) return '请填写客户关键人完整信息'
       return ''
     }
 
-    const toTemplateSelect = () => {
-      if (!clue.value) return
-      const err = validate()
-      if (err) {
-        messageType.value = 'error'
-        message.value = err
-        return
+    const saveCultivate = async () => {
+      if (!lead.value || lead.value.status !== 'DISTRIBUTED') return
+      saving.value = true
+      try {
+        await leadApi.cultivate(lead.value.id, serializeCultivateForm(form))
+        ElMessage.success('培育详情已保存')
+        await loadAll()
+      } catch (e: any) {
+        ElMessage.error(e?.message || '保存失败')
+      } finally {
+        saving.value = false
       }
-
-      // 演示：把培育信息写回线索
-      clue.value.projectName = form.projectName
-      clue.value.expectedPurchaseTime = form.expectedPurchaseTime
-      clue.value.signingProbability = form.signingProbability
-      clue.value.predictedAmount = form.predictedAmount
-      clue.value.clueLevel = form.clueLevel
-      clue.value.solutionManager = form.solutionManager
-      clue.value.opportunityOwnerId = form.opportunityOwnerId
-      clue.value.keyContact = { ...form.keyContact }
-
-      // 生成商机（阶段=模板选择）
-      const opportunityId = `o_${Date.now()}`
-      store.opportunities.push({
-        id: opportunityId,
-        clueId: clue.value.id,
-        customerId: clue.value.customerId,
-        opportunityName: `${clue.value.customerName || '客户'}-${clue.value.clueName}-商机`,
-        stage: '模板选择',
-        templateKey: undefined,
-        managerId: form.opportunityOwnerId,
-        triangleIds: employeeId ? [employeeId, form.opportunityOwnerId] : [form.opportunityOwnerId],
-        coreGroupIds: [form.opportunityOwnerId],
-        tasks: [],
-      })
-
-      messageType.value = 'success'
-      message.value = '转商机成功：进入模板选择'
-      setTimeout(() => router.push({ path: '/opportunities/template', query: { opportunityId } }), 500)
     }
 
+    const convert = async () => {
+      if (!lead.value || lead.value.status !== 'DISTRIBUTED') return
+      const err = validate()
+      if (err) {
+        ElMessage.error(err)
+        return
+      }
+      try {
+        await ElMessageBox.confirm('转商机后线索将进入 CONVERTED 终态,且自动创建商机占位。确认转商机?', '确认转商机', {
+          confirmButtonText: '确认',
+          cancelButtonText: '取消',
+          type: 'warning',
+        })
+      } catch {
+        return
+      }
+      converting.value = true
+      try {
+        // 先保存最新培育详情(后端 convert 会读 progress_desc)
+        await leadApi.cultivate(lead.value.id, serializeCultivateForm(form))
+        const resp = await leadApi.convert(lead.value.id)
+        ElMessage.success(`转商机成功:${resp.opportunityName}`)
+        setTimeout(() => router.push({ path: '/opportunities/list' }), 600)
+      } catch (e: any) {
+        ElMessage.error(e?.message || '转商机失败')
+      } finally {
+        converting.value = false
+      }
+    }
+
+    onMounted(loadAll)
+
     return {
-      clue,
+      lead,
+      loading,
       projectManagers,
+      pmLoading,
+      saving,
+      converting,
       form,
-      message,
-      messageType,
-      toTemplateSelect,
+      saveCultivate,
+      convert,
       goBack,
+      leadStatusToStage,
+      leadStageTagType,
+      ArrowLeft, MagicStick, Check,
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.page-title {
-  font-weight: 800;
-  font-size: 16px;
-  margin-bottom: 6px;
-}
-.subhint {
-  color: #64748b;
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-.empty {
-  padding: 16px;
-  color: #64748b;
-  background: #fff;
-  border: 1px dashed #cbd5e1;
-  border-radius: 14px;
-}
-.card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 14px;
-}
-.summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.summary-item {
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 10px;
-}
-.label {
-  display: block;
-  font-size: 12px;
-  color: #64748b;
-  margin-bottom: 6px;
-}
-.value {
-  font-weight: 800;
-  font-size: 13px;
-}
+.page { max-width: 1400px; margin: 0 auto; }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.page-title { font-size: 18px; font-weight: 600; color: #0F172A; margin: 0; }
+.hint-alert { margin-bottom: 16px; border-radius: 10px; }
+.summary-card, .form-card { border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 16px; }
+.summary-card :deep(.el-card__body) { padding: 16px 20px; }
+.form-card :deep(.el-card__body) { padding: 24px; }
+.alert-banner { margin-bottom: 16px; border-radius: 10px; }
+.clue-name { font-weight: 600; color: #0F172A; }
+:deep(.el-descriptions__label) { width: 120px; background: #F8FAFC !important; color: #475569 !important; font-weight: 500 !important; }
 .section-title {
-  margin: 14px 0 10px;
-  font-weight: 900;
+  font-weight: 600; font-size: 14px; color: #0F172A;
+  margin: 8px 0 16px; padding-left: 8px; border-left: 3px solid #0369A1;
 }
-.req {
-  color: #ef4444;
-  font-weight: 700;
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.field label {
-  font-size: 12px;
-  color: #334155;
-}
-.field input,
-.field select {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  height: 36px;
-  padding: 0 10px;
-}
-.footer-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 14px;
-}
-.btn {
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  border-radius: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.btn-primary {
-  background: #0369a1;
-  color: #fff;
-  border-color: #0369a1;
-}
-.message {
-  margin-top: 12px;
-  border-radius: 12px;
-  padding: 10px 12px;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  color: #334155;
-  font-size: 13px;
-}
-.message.error {
-  border-color: #fca5a5;
-  background: #fff1f2;
-  color: #b91c1c;
-}
-@media (max-width: 980px) {
-  .summary {
-    grid-template-columns: 1fr;
-  }
-  .grid {
-    grid-template-columns: 1fr;
-  }
-}
+.footer-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px; padding-top: 20px; border-top: 1px solid #F1F5F9; }
+:deep(.el-button--primary) { background-color: #0369A1; border-color: #0369A1; &:hover { background-color: #0284C7; border-color: #0284C7; } }
 </style>
-
