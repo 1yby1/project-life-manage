@@ -7,335 +7,136 @@
     <el-card class="filter-card" shadow="never">
       <el-form :inline="true" :model="query" class="search-form">
         <el-form-item label="商机名称">
-          <el-input
-            v-model="query.opportunityName"
-            placeholder="输入商机名称"
-            clearable
-            :prefix-icon="Search"
-          />
-        </el-form-item>
-        <el-form-item label="客户">
-          <el-input
-            v-model="query.customerName"
-            placeholder="输入客户名称"
-            clearable
-            :prefix-icon="User"
-          />
+          <el-input v-model="query.keyword" placeholder="输入商机名称" clearable :prefix-icon="Search" @keyup.enter="reload" />
         </el-form-item>
         <el-form-item label="阶段">
-          <el-select v-model="query.stage" placeholder="选择阶段" clearable style="width: 140px">
-            <el-option label="全部" value="all" />
-            <el-option label="模板选择" value="模板选择" />
-            <el-option label="推进中" value="推进中" />
-            <el-option label="已结束" value="已结束" />
+          <el-select v-model="query.stage" placeholder="选择阶段" clearable style="width: 160px">
+            <el-option label="全部" value="" />
+            <el-option label="验证机会点" value="VALIDATE" />
+            <el-option label="谈判与签约" value="NEGOTIATE" />
+            <el-option label="项目实施" value="IMPLEMENT" />
+            <el-option label="验收与交付" value="DELIVERY" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="pageIndex = 1">搜索</el-button>
+          <el-button type="primary" :icon="Search" @click="reload">搜索</el-button>
+          <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <el-card class="table-card" shadow="never">
-      <el-table :data="paged" style="width: 100%" stripe>
-        <el-table-column prop="opportunityName" label="商机名称" min-width="180" />
-        <el-table-column label="客户" min-width="150">
+      <el-table :data="rows" stripe v-loading="loading" empty-text="暂无商机数据">
+        <el-table-column prop="oppName" label="商机名称" min-width="200">
           <template #default="{ row }">
-            {{ customerName(row.customerId) }}
+            <span class="opp-name">{{ row.oppName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="阶段" width="120">
+        <el-table-column label="客户" prop="customerName" min-width="150" />
+        <el-table-column label="阶段" width="130">
           <template #default="{ row }">
-            <el-tag :type="getStageTagType(row.stage)" effect="light">
-              {{ row.stage }}
+            <el-tag :type="oppStageTagType(row.stage)" effect="light" round>
+              {{ oppStageLabel(row.stage) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="进度" width="180">
+        <el-table-column label="PM" prop="pmName" width="110" />
+        <el-table-column label="模板" width="160">
           <template #default="{ row }">
-            <el-progress
-              :percentage="getProgress(row)"
-              :color="getProgressColor(row)"
-              :stroke-width="8"
-            />
+            <span v-if="row.templateName">{{ row.templateName }}</span>
+            <el-tag v-else type="warning" size="small" effect="plain">未选模板</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="templateKey" label="模板" width="120">
-          <template #default="{ row }">
-            {{ row.templateKey || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.stage === '模板选择'"
+              v-if="!row.templateId"
+              link
               type="primary"
-              size="small"
+              :icon="Setting"
               @click="goTemplate(row.id)"
             >
-              选择商机推进模板
+              选择推进模板
             </el-button>
-            <el-button
-              v-else
-              size="small"
-              @click="goDetail(row.id)"
-            >
+            <el-button v-else link type="primary" :icon="View" @click="goDetail(row.id)">
               进入项目详情
             </el-button>
           </template>
         </el-table-column>
-        <template #empty>
-          <el-empty description="暂无数据" :image-size="100" />
-        </template>
       </el-table>
-
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="pageIndex"
-          :page-size="pageSize"
-          :total="filtered.length"
-          layout="prev, pager, next, total"
-          background
-        />
-      </div>
     </el-card>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, reactive, ref } from 'vue'
-import { useMockStore } from '@/store/mockStore'
+import { defineComponent, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, User } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { Search, RefreshLeft, Setting, View } from '@element-plus/icons-vue'
+import { opportunityApi, Opportunity, oppStageLabel, oppStageTagType } from '@/api/opportunity'
 
 export default defineComponent({
   name: 'OpportunityListView',
   setup() {
-    const store = useMockStore()
     const router = useRouter()
+    const rows = ref<Opportunity[]>([])
+    const loading = ref(false)
 
     const query = reactive({
-      opportunityName: '',
-      customerName: '',
-      stage: 'all' as 'all' | '模板选择' | '推进中' | '已结束',
+      keyword: '',
+      stage: '',
     })
 
-    const pageSize = 10
-    const pageIndex = ref(1)
-
-    const filtered = computed(() => {
-      return store.opportunities.filter((o) => {
-        const okName = query.opportunityName ? o.opportunityName.includes(query.opportunityName) : true
-        const okCustomer = query.customerName
-          ? (store.customers.find((c) => c.id === o.customerId)?.customerName || '').includes(query.customerName)
-          : true
-        const okStage = query.stage === 'all' ? true : o.stage === query.stage
-        return okName && okCustomer && okStage
-      })
-    })
-
-    const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
-    const paged = computed(() => {
-      const start = (pageIndex.value - 1) * pageSize
-      return filtered.value.slice(start, start + pageSize)
-    })
-
-    const customerName = (customerId?: string) => store.customers.find((c) => c.id === customerId)?.customerName || '-'
-
-    const goTemplate = (opportunityId: string) => router.push({ path: '/opportunities/template', query: { opportunityId } })
-    const goDetail = (opportunityId: string) => router.push({ path: `/opportunities/${opportunityId}` })
-
-    const getStageTagType = (stage: string) => {
-      switch (stage) {
-        case '模板选择': return 'info'
-        case '推进中': return 'warning'
-        case '已结束': return 'success'
-        default: return ''
+    const reload = async () => {
+      loading.value = true
+      try {
+        rows.value = await opportunityApi.list({
+          keyword: query.keyword.trim() || undefined,
+          stage: query.stage || undefined,
+        })
+      } catch (e: any) {
+        ElMessage.error(e?.message || '加载失败')
+        rows.value = []
+      } finally {
+        loading.value = false
       }
     }
 
-    const getProgress = (row: any) => {
-      switch (row.stage) {
-        case '模板选择': return 10
-        case '推进中': return 50
-        case '已结束': return 100
-        default: return 0
-      }
+    const resetQuery = () => {
+      query.keyword = ''
+      query.stage = ''
+      reload()
     }
 
-    const getProgressColor = (row: any) => {
-      switch (row.stage) {
-        case '模板选择': return '#94A3B8'
-        case '推进中': return '#D97706'
-        case '已结束': return '#059669'
-        default: return '#E2E8F0'
-      }
-    }
+    const goTemplate = (id: number) => router.push({ path: '/opportunities/template', query: { opportunityId: id } })
+    const goDetail = (id: number) => router.push({ path: '/opportunities/detail', query: { opportunityId: id } })
+
+    onMounted(reload)
 
     return {
-      Search,
-      User,
-      query,
-      pageIndex,
-      pageSize,
-      totalPages,
-      filtered,
-      paged,
-      customerName,
-      goTemplate,
-      goDetail,
-      getStageTagType,
-      getProgress,
-      getProgressColor,
+      rows, loading, query, reload, resetQuery, goTemplate, goDetail,
+      oppStageLabel, oppStageTagType,
+      Search, RefreshLeft, Setting, View,
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.page {
-  padding: 20px;
-  background: #F8FAFC;
-  min-height: 100%;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.page-title {
-  font-weight: 700;
-  font-size: 20px;
-  color: #0F172A;
-  margin: 0;
-}
-
-.filter-card {
-  margin-bottom: 16px;
-  border-radius: 12px;
-  border: 1px solid #E2E8F0;
-
-  :deep(.el-card__body) {
-    padding: 16px;
-  }
-
-  .search-form {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: flex-end;
-  }
-
-  :deep(.el-form-item) {
-    margin-bottom: 0;
-    margin-right: 0;
-  }
-
-  :deep(.el-form-item__label) {
-    color: #334155;
-    font-size: 13px;
-    font-weight: 500;
-  }
-
-  :deep(.el-input) {
-    width: 180px;
-  }
-
-  :deep(.el-input__wrapper) {
-    border-radius: 8px;
-    box-shadow: 0 0 0 1px #E2E8F0;
-
-    &:hover {
-      box-shadow: 0 0 0 1px #CBD5E1;
-    }
-
-    &.is-focus {
-      box-shadow: 0 0 0 1px #0369A1;
-    }
-  }
-
-  :deep(.el-select .el-input__wrapper) {
-    border-radius: 8px;
+.page { max-width: 1400px; margin: 0 auto; }
+.page-header { margin-bottom: 16px; }
+.page-title { font-size: 18px; font-weight: 600; color: #0F172A; margin: 0; }
+.filter-card, .table-card {
+  border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 16px;
+  :deep(.el-card__body) { padding: 16px 20px; }
+  :deep(.el-table th.el-table__cell) {
+    background: #F8FAFC !important; color: #0F172A; font-weight: 600; font-size: 13px;
   }
 }
-
-.table-card {
-  border-radius: 12px;
-  border: 1px solid #E2E8F0;
-
-  :deep(.el-card__body) {
-    padding: 0;
-  }
-
-  :deep(.el-table) {
-    --el-table-header-bg-color: #F8FAFC;
-    --el-table-header-text-color: #334155;
-    --el-table-row-hover-bg-color: #F1F5F9;
-    --el-table-border-color: #E2E8F0;
-    font-size: 13px;
-  }
-
-  :deep(.el-table th) {
-    font-weight: 600;
-  }
-
-  :deep(.el-table__empty-block) {
-    padding: 40px 0;
-  }
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  padding: 16px;
-  border-top: 1px solid #E2E8F0;
-}
-
+.search-form :deep(.el-form-item) { margin-bottom: 0; margin-right: 16px; }
+.opp-name { font-weight: 600; color: #0F172A; }
 :deep(.el-button--primary) {
-  --el-button-bg-color: #0369A1;
-  --el-button-border-color: #0369A1;
-  --el-button-hover-bg-color: #0284C7;
-  --el-button-hover-border-color: #0284C7;
-}
-
-:deep(.el-tag--success) {
-  --el-tag-bg-color: #ECFDF5;
-  --el-tag-border-color: #A7F3D0;
-  --el-tag-text-color: #059669;
-}
-
-:deep(.el-tag--warning) {
-  --el-tag-bg-color: #FFFBEB;
-  --el-tag-border-color: #FDE68A;
-  --el-tag-text-color: #D97706;
-}
-
-:deep(.el-tag--info) {
-  --el-tag-bg-color: #F1F5F9;
-  --el-tag-border-color: #CBD5E1;
-  --el-tag-text-color: #334155;
-}
-
-:deep(.el-tag--danger) {
-  --el-tag-bg-color: #FEF2F2;
-  --el-tag-border-color: #FECACA;
-  --el-tag-text-color: #DC2626;
-}
-
-:deep(.el-progress-bar__outer) {
-  border-radius: 4px;
-  background-color: #E2E8F0;
-}
-
-:deep(.el-progress-bar__inner) {
-  border-radius: 4px;
-}
-
-:deep(.el-pagination.is-background .el-pager li:not(.is-disabled).is-active) {
-  background-color: #0369A1;
+  background-color: #0369A1; border-color: #0369A1;
+  &:hover { background-color: #0284C7; border-color: #0284C7; }
 }
 </style>
-
