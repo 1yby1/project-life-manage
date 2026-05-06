@@ -1,278 +1,161 @@
 <template>
   <div class="page">
-    <div class="page-title">在途合同专题</div>
-    <div class="subhint">面向区总的合同进度视图：用于催流程、催客户签订合同（演示：根据付款节点是否已回款展示进度）。</div>
+    <div class="page-header">
+      <h2 class="page-title">在途合同专题</h2>
+      <span class="page-meta">区总 / OPP_ADMIN 视角 — 催流程催签约</span>
+    </div>
 
-    <section class="toolbar">
-      <div class="field">
-        <label>合同名称</label>
-        <input v-model="query.contractName" placeholder="输入关键字" />
-      </div>
-      <div class="field">
-        <label>客户</label>
-        <input v-model="query.customerName" placeholder="输入客户名称" />
-      </div>
-      <div class="field actions">
-        <button class="btn btn-primary" type="button" @click="pageIndex = 1">搜索</button>
-        <button class="btn" type="button" @click="reset">重置</button>
-      </div>
-    </section>
+    <el-card class="filter-card" shadow="never">
+      <el-form :inline="true" :model="query" class="search-form">
+        <el-form-item label="年份">
+          <el-select v-model="query.year" placeholder="全部" clearable style="width: 140px">
+            <el-option v-for="y in yearOptions" :key="y" :label="`${y} 年`" :value="y" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="BU">
+          <el-input v-model="query.bu" placeholder="所属业务单元" clearable style="width: 200px" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :icon="Search" @click="reload">查询</el-button>
+          <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
 
-    <section class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>合同</th>
-            <th>客户</th>
-            <th>金额</th>
-            <th>回款节点</th>
-            <th>进度</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="c in paged" :key="c.id">
-            <td>
-              <div class="name">{{ c.contractName }}</div>
-              <div class="meta">类型：{{ c.contractType }}</div>
-            </td>
-            <td>{{ customerName(c.customerId) }}</td>
-            <td>{{ formatMoney(c.contractAmount) }}</td>
-            <td>
-              <div class="nodes">
-                <div v-for="pn in c.paymentNodes" :key="pn.id" class="node" :class="{ paid: !!pn.paidAt }">
-                  {{ pn.nodeName }}：{{ pn.paidAt ? '已回款' : '未回款' }}
-                </div>
-              </div>
-            </td>
-            <td>
-              <div class="progress">
-                <div class="bar-wrap">
-                  <div class="bar" :style="{ width: `${progressPct(c)}%` }" />
-                </div>
-                <div class="pct">{{ progressPct(c) }}%</div>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="paged.length === 0">
-            <td colspan="5" class="empty">暂无数据</td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="pagination">
-        <button class="btn" type="button" :disabled="pageIndex === 1" @click="pageIndex--">上一页</button>
-        <div class="page-meta">第 {{ pageIndex }} 页 / 共 {{ totalPages }} 页</div>
-        <button class="btn" type="button" :disabled="pageIndex === totalPages" @click="pageIndex++">下一页</button>
-      </div>
-    </section>
+    <el-row :gutter="16" class="stats-row">
+      <el-col :xs="24" :sm="8">
+        <el-card class="stat-card" shadow="never">
+          <div class="stat-label">在途合同数</div>
+          <div class="stat-value">{{ rows.length }}</div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="8">
+        <el-card class="stat-card" shadow="never">
+          <div class="stat-label">总合同金额</div>
+          <div class="stat-value">{{ formatMoney(totalAmount) }}</div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="8">
+        <el-card class="stat-card" shadow="never">
+          <div class="stat-label">已收款金额</div>
+          <div class="stat-value">{{ formatMoney(totalPaid) }}</div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-card class="table-card" shadow="never">
+      <el-table :data="rows" stripe v-loading="loading" empty-text="暂无在途合同">
+        <el-table-column label="合同名称" prop="contractName" min-width="220" />
+        <el-table-column label="客户" prop="customerName" min-width="150" />
+        <el-table-column label="年份" prop="contractYear" width="80" />
+        <el-table-column label="合同金额" align="right" min-width="140">
+          <template #default="{ row }">{{ formatMoney(row.totalAmount) }}</template>
+        </el-table-column>
+        <el-table-column label="已收款" align="right" min-width="140">
+          <template #default="{ row }">
+            <span :class="{ 'text-success': row.paidAmount > 0 }">{{ formatMoney(row.paidAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="收款率" width="160">
+          <template #default="{ row }">
+            <el-progress
+              :percentage="paidRatio(row)"
+              :color="ratioColor(paidRatio(row))"
+              :stroke-width="8"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" prop="createTime" min-width="170" />
+      </el-table>
+    </el-card>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, reactive, ref } from 'vue'
-import { useMockStore } from '@/store/mockStore'
+import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Search, RefreshLeft } from '@element-plus/icons-vue'
+import { contractApi, Contract, formatMoney } from '@/api/contract'
 
 export default defineComponent({
   name: 'InFlightContractsView',
   setup() {
-    const store = useMockStore()
+    const rows = ref<Contract[]>([])
+    const loading = ref(false)
 
     const query = reactive({
-      contractName: '',
-      customerName: '',
+      year: undefined as number | undefined,
+      bu: '',
     })
 
-    const pageSize = 8
-    const pageIndex = ref(1)
+    const currentYear = new Date().getFullYear()
+    const yearOptions = [currentYear, currentYear - 1, currentYear - 2, 2019]
 
-    const executing = computed(() => store.contracts.filter((c) => c.status === '执行中'))
-
-    const filtered = computed(() => {
-      return executing.value.filter((c) => {
-        const okContract = query.contractName ? c.contractName.includes(query.contractName) : true
-        const okCustomer = query.customerName
-          ? (store.customers.find((cc) => cc.id === c.customerId)?.customerName || '').includes(query.customerName)
-          : true
-        return okContract && okCustomer
-      })
-    })
-
-    const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
-    const paged = computed(() => {
-      const start = (pageIndex.value - 1) * pageSize
-      return filtered.value.slice(start, start + pageSize)
-    })
-
-    const customerName = (customerId: string) => store.customers.find((c) => c.id === customerId)?.customerName || '-'
-    const formatMoney = (n: number) => `￥${Number(n).toLocaleString()}`
-
-    const progressPct = (c: any) => {
-      const total = c.paymentNodes.reduce((sum: number, pn: any) => sum + Number(pn.amount), 0) || 1
-      const paid = c.paymentNodes.reduce((sum: number, pn: any) => sum + (pn.paidAt ? Number(pn.amount) : 0), 0)
-      return Math.round((paid / total) * 100)
+    const reload = async () => {
+      loading.value = true
+      try {
+        rows.value = await contractApi.inFlight(query.year, query.bu || undefined)
+      } catch (e: any) {
+        ElMessage.error(e?.message || '加载失败')
+        rows.value = []
+      } finally {
+        loading.value = false
+      }
     }
 
-    const reset = () => {
-      query.contractName = ''
-      query.customerName = ''
-      pageIndex.value = 1
+    const resetQuery = () => {
+      query.year = undefined
+      query.bu = ''
+      reload()
     }
+
+    const totalAmount = computed(() => rows.value.reduce((s, r) => s + Number(r.totalAmount || 0), 0))
+    const totalPaid = computed(() => rows.value.reduce((s, r) => s + Number(r.paidAmount || 0), 0))
+
+    const paidRatio = (row: Contract): number => {
+      if (!row.totalAmount || Number(row.totalAmount) <= 0) return 0
+      return Math.min(100, Math.round((Number(row.paidAmount || 0) / Number(row.totalAmount)) * 100))
+    }
+    const ratioColor = (n: number): string => {
+      if (n >= 80) return '#059669'
+      if (n >= 50) return '#0369A1'
+      if (n >= 20) return '#D97706'
+      return '#DC2626'
+    }
+
+    onMounted(reload)
 
     return {
-      query,
-      pageIndex,
-      totalPages,
-      paged,
-      reset,
-      customerName,
+      rows, loading, query, yearOptions,
+      reload, resetQuery,
+      totalAmount, totalPaid,
+      paidRatio, ratioColor,
       formatMoney,
-      progressPct,
+      Search, RefreshLeft,
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.page-title {
-  font-weight: 800;
-  font-size: 16px;
-  margin-bottom: 6px;
+.page { max-width: 1400px; margin: 0 auto; }
+.page-header { margin-bottom: 16px; display: flex; align-items: baseline; gap: 12px; }
+.page-title { font-size: 18px; font-weight: 600; color: #0F172A; margin: 0; }
+.page-meta { color: #64748B; font-size: 13px; }
+.filter-card, .table-card {
+  border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 16px;
+  :deep(.el-card__body) { padding: 16px 20px; }
+  :deep(.el-table th.el-table__cell) {
+    background: #F8FAFC !important; color: #0F172A; font-weight: 600; font-size: 13px;
+  }
 }
-.subhint {
-  color: #64748b;
-  font-size: 13px;
-  margin-bottom: 12px;
-  line-height: 1.6;
+.search-form :deep(.el-form-item) { margin-bottom: 0; margin-right: 16px; }
+.stats-row { margin-bottom: 16px; }
+.stat-card {
+  border-radius: 12px; border: 1px solid #E2E8F0;
+  :deep(.el-card__body) { padding: 16px 20px; }
 }
-.toolbar {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 12px;
-  margin-bottom: 12px;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.field label {
-  font-size: 12px;
-  color: #334155;
-}
-.field input {
-  height: 36px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 0 10px;
-}
-.field.actions {
-  justify-content: flex-end;
-  flex-direction: row;
-  align-items: flex-end;
-  gap: 10px;
-}
-.btn {
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  border-radius: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 12px;
-  text-decoration: none;
-  color: inherit;
-}
-.btn-primary {
-  background: #0369a1;
-  color: #fff;
-  border-color: #0369a1;
-}
-.table-wrap {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  overflow: hidden;
-}
-.table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.table th,
-.table td {
-  padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  text-align: left;
-  font-size: 13px;
-  vertical-align: top;
-}
-.table th {
-  background: #f8fafc;
-  font-weight: 800;
-}
-.empty {
-  padding: 14px;
-  text-align: center;
-  color: #64748b;
-}
-.name {
-  font-weight: 900;
-  margin-bottom: 6px;
-}
-.meta {
-  color: #64748b;
-  font-size: 12px;
-}
-.nodes {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.node {
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  color: #334155;
-}
-.node.paid {
-  background: #ecfdf5;
-  border-color: #bbf7d0;
-  color: #065f46;
-}
-.progress {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.bar-wrap {
-  width: 160px;
-  height: 10px;
-  background: #e5e7eb;
-  border-radius: 999px;
-  overflow: hidden;
-}
-.bar {
-  height: 100%;
-  background: #38bdf8;
-}
-.pct {
-  width: 46px;
-  text-align: right;
-  font-weight: 900;
-  color: #0369a1;
-}
-.pagination {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-}
-.page-meta {
-  font-size: 12px;
-  color: #334155;
-}
+.stat-label { font-size: 13px; color: #64748B; margin-bottom: 4px; }
+.stat-value { font-size: 24px; font-weight: 700; color: #0369A1; }
+.text-success { color: #059669; font-weight: 600; }
 </style>
-
