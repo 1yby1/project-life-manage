@@ -1,64 +1,64 @@
 <template>
   <el-container v-if="!hideShell" class="app-shell">
-    <el-header class="topbar">
+    <el-aside width="240px" class="sidebar">
       <div class="brand">
-        <el-icon :size="24" style="margin-right: 8px"><Suitcase /></el-icon>
-        项目全生命周期管理系统
+        <div class="brand-logo">
+          <el-icon :size="20"><Suitcase /></el-icon>
+        </div>
+        <div class="brand-name">项目全生命周期管理系统</div>
       </div>
-      <div class="topbar-right">
-        <el-dropdown trigger="click" :disabled="!isDemo">
-          <el-button type="primary" :icon="UserFilled">
-            {{ role }}
-            <el-icon class="el-icon--right"><arrow-down /></el-icon>
-          </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item v-for="r in roleOptions" :key="r" @click="role = r">
-                {{ r }}
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <el-button type="default" :icon="RefreshRight" @click="resetDemoData">
-          重置演示数据
-        </el-button>
-      </div>
-    </el-header>
+
+      <el-menu :default-active="activeMenu" router class="sidebar-menu">
+        <template v-for="g in groupedMenu" :key="g.group">
+          <div class="group-title">{{ g.group }}</div>
+          <el-menu-item
+            v-for="item in g.items"
+            :key="item.path"
+            :index="item.path"
+            class="sidebar-item"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.title }}</span>
+          </el-menu-item>
+        </template>
+
+        <div v-if="groupedMenu.length === 0" class="empty-menu">
+          当前角色暂无可访问模块
+        </div>
+      </el-menu>
+    </el-aside>
 
     <el-container>
-      <el-aside width="240px" class="sidebar">
-        <el-menu
-          :default-active="activeMenu"
-          router
-          @select="handleMenuSelect"
-        >
-          <el-menu-item index="/customers/list">
-            <el-icon><User /></el-icon>
-            <span>客户管理</span>
-          </el-menu-item>
-          <el-menu-item index="/contracts/board">
-            <el-icon><Document /></el-icon>
-            <span>合同管理</span>
-          </el-menu-item>
-          <el-menu-item index="/clues/list">
-            <el-icon><Bell /></el-icon>
-            <span>线索管理</span>
-          </el-menu-item>
-          <el-menu-item index="/opportunities/list">
-            <el-icon><TrendCharts /></el-icon>
-            <span>商机管理</span>
-          </el-menu-item>
-          <el-divider />
-          <el-menu-item index="/reports/submit">
-            <el-icon><Edit /></el-icon>
-            <span>周报管理</span>
-          </el-menu-item>
-          <el-menu-item index="/analytics/inflight">
-            <el-icon><DataAnalysis /></el-icon>
-            <span>专题分析</span>
-          </el-menu-item>
-        </el-menu>
-      </el-aside>
+      <el-header class="topbar">
+        <div class="breadcrumb">
+          <span v-if="parentLabel" class="bc-parent">{{ parentLabel }}</span>
+          <span v-if="parentLabel" class="bc-sep">/</span>
+          <span class="bc-current">{{ currentLabel }}</span>
+        </div>
+        <div class="topbar-right">
+          <div class="user-info">
+            <el-icon class="user-icon"><UserFilled /></el-icon>
+            <div class="user-text">
+              <div class="user-name">{{ displayName }}</div>
+              <div class="user-roles">
+                <el-tag
+                  v-for="r in displayRoles"
+                  :key="r"
+                  size="small"
+                  :type="r === '系统管理员' ? 'danger' : 'primary'"
+                  effect="light"
+                  round
+                >
+                  {{ r }}
+                </el-tag>
+              </div>
+            </div>
+          </div>
+          <el-button type="default" :icon="SwitchButton" @click="doLogout">
+            退出登录
+          </el-button>
+        </div>
+      </el-header>
 
       <el-main class="content">
         <router-view />
@@ -72,84 +72,194 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { resetDemoData } from '@/store/mockStore'
-import { getAuthState, isDemoSession, loginAsDemoRole } from '@/auth/authStore'
+import { computed, defineComponent } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getAuthState, logout, userHasAnyRole } from '@/auth/authStore'
+import { roleCodeToName } from '@/auth/roles'
+import { UserFilled, SwitchButton, Suitcase } from '@element-plus/icons-vue'
+import type { RouteMeta, SidebarGroup } from '@/router'
+
+type MenuItem = { path: string; title: string; icon: string; order: number }
+
+// 分组渲染顺序(自上而下)
+const GROUP_ORDER: SidebarGroup[] = ['工作台', '业务漏斗', '运营专题', '系统管理']
 
 export default defineComponent({
   name: 'MainLayout',
+  components: { UserFilled, SwitchButton, Suitcase },
   setup() {
-    const role = ref('商机管理员')
     const authState = getAuthState()
     const route = useRoute()
+    const router = useRouter()
 
-    const hideShell = computed(() => route.path === '/login')
-    const isDemo = computed(() => isDemoSession())
+    const hideShell = computed(() => route.path === '/login' || route.path === '/403')
 
-    onMounted(() => {
-      const saved = window.localStorage.getItem('demo_role')
-      if (saved) role.value = saved
+    /** 当前用户真实姓名(后端返回的 realName 或 username) */
+    const displayName = computed(() => authState.user?.name || '未登录')
 
-      // 如果是后端鉴权，登录后展示后端角色（本地 demo 下会锁定为选择项）
-      if (authState.user?.roles?.length) {
-        // 尽量取第一角色作为展示
-        role.value = authState.user.roles[0] || role.value
-      }
+    /** 当前用户全部角色的中文名(已过滤兜底 USER) */
+    const displayRoles = computed(() => {
+      const roles = authState.user?.roles || []
+      // 当用户除 USER 外还有其他角色时,隐藏 USER(避免视觉冗余)
+      const filtered = roles.length > 1 ? roles.filter((r) => r !== 'USER') : roles
+      return filtered.map(roleCodeToName)
     })
 
-    watch(
-      role,
-      async (next) => {
-        // 仅 demo 会影响“当前用户角色”
-        if (!isDemo.value) return
-        await loginAsDemoRole(next)
-      },
-      { immediate: true },
-    )
+    const doLogout = () => {
+      logout()
+      router.push({ name: 'login' })
+    }
+
+    /** 当前用户可见的菜单,按 group 聚合后输出 */
+    const groupedMenu = computed(() => {
+      const user = authState.user
+      const buckets = new Map<SidebarGroup, MenuItem[]>()
+
+      for (const r of router.options.routes) {
+        const m = r.meta as RouteMeta | undefined
+        if (!m || !m.menu) continue
+        if (!userHasAnyRole(user, m.roles)) continue
+        const group = m.menu.group
+        const item: MenuItem = {
+          path: r.path as string,
+          title: m.menu.title,
+          icon: m.menu.icon,
+          order: m.menu.order,
+        }
+        const arr = buckets.get(group)
+        if (arr) arr.push(item)
+        else buckets.set(group, [item])
+      }
+
+      // 按预定义顺序输出非空组,组内按 order 升序
+      const out: Array<{ group: SidebarGroup; items: MenuItem[] }> = []
+      for (const g of GROUP_ORDER) {
+        const items = buckets.get(g)
+        if (!items) continue
+        out.push({ group: g, items: items.slice().sort((a, b) => a.order - b.order) })
+      }
+      return out
+    })
+
+    /** 当前激活的菜单: 路径前缀最长匹配 */
+    const activeMenu = computed(() => {
+      const current = route.path
+      const all: MenuItem[] = []
+      for (const g of groupedMenu.value) {
+        for (const it of g.items) all.push(it)
+      }
+      const exact = all.find((m) => m.path === current)
+      if (exact) return exact.path
+      const seg = '/' + current.split('/')[1]
+      const prefix = all.find((m) => m.path.indexOf(seg + '/') === 0 || m.path === seg)
+      return prefix ? prefix.path : ''
+    })
+
+    /**
+     * 面包屑父级:当前路由所属菜单分组名(工作台/业务漏斗/...)
+     * 子页(没有 menu 字段)取其前缀菜单的 group
+     */
+    const parentLabel = computed(() => {
+      const m = route.meta as RouteMeta | undefined
+      if (m?.menu) return m.menu.group
+      // 子页 → 找前缀菜单
+      const seg = '/' + route.path.split('/')[1]
+      for (const g of groupedMenu.value) {
+        const hit = g.items.find((it) => it.path.indexOf(seg + '/') === 0 || it.path === seg)
+        if (hit) return g.group
+      }
+      return ''
+    })
+
+    /** 面包屑当前页:菜单页用 menu.title,非菜单页用 meta.title,兜底用末段 */
+    const currentLabel = computed(() => {
+      const m = route.meta as RouteMeta | undefined
+      if (m?.menu) return m.menu.title
+      if (m?.title) return m.title
+      const last = route.path.split('/').filter(Boolean).pop() || ''
+      return last
+    })
 
     return {
-      role,
-      resetDemoData,
       hideShell,
-      isDemo,
+      displayName,
+      displayRoles,
+      doLogout,
+      groupedMenu,
+      activeMenu,
+      parentLabel,
+      currentLabel,
+      UserFilled,
+      SwitchButton,
+      Suitcase,
     }
   },
 })
 </script>
 
 <style lang="scss" scoped>
-
 .app-shell {
   min-height: 100vh;
-  background: #f4f6f8;
-  color: #1e293b;
-  font-family: system-ui, -apple-system, sans-serif;
+  background: #f3f4f6;
+  color: #111827;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-.topbar {
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.03);
-}
-
-.brand {
-  font-weight: 600;
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  color: #0f172a;
-}
+/* ---------- Sidebar ---------- */
 
 .sidebar {
   width: 240px;
   background: #ffffff;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #0369a1;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-menu {
+  flex: 1;
+  padding: 8px 0 16px;
+  overflow-y: auto;
+}
+
+.group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  letter-spacing: 0.5px;
+  padding: 16px 16px 8px;
+  user-select: none;
 }
 
 :deep(.el-menu) {
@@ -158,38 +268,78 @@ export default defineComponent({
 }
 
 :deep(.el-menu-item) {
-  color: #475569;
-  border-radius: 8px;
+  color: #6b7280;
+  border-radius: 6px;
   margin: 4px 12px;
-  transition: all 0.2s ease;
-  height: 48px;
-  line-height: 48px;
+  padding-left: 16px !important;
+  transition: background 200ms ease, color 200ms ease;
+  height: 40px;
+  line-height: 40px;
+  position: relative;
 }
 
 :deep(.el-menu-item:hover) {
-  background: #f8fafc !important;
-  color: #0284c7;
+  background: #f3f4f6 !important;
+  color: #0369a1;
 }
 
 :deep(.el-menu-item.is-active) {
   background: #e0f2fe !important;
-  color: #0284c7;
+  color: #0369a1;
   font-weight: 600;
 }
 
-:deep(.el-button--default) {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  color: #475569;
-  border-radius: 6px;
+/* Active 项左侧 2px 强调条 */
+:deep(.el-menu-item.is-active::before) {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 24px;
+  background: #0369a1;
+  border-radius: 2px;
 }
 
-:deep(.el-button--primary) {
-  background: #0ea5e9;
-  border-color: #0ea5e9;
-  color: #ffffff;
-  border-radius: 6px;
-  font-weight: 500;
+.empty-menu {
+  padding: 32px 16px;
+  color: #9ca3af;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---------- Topbar ---------- */
+
+.topbar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: none;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.bc-parent {
+  color: #9ca3af;
+}
+
+.bc-sep {
+  color: #d1d5db;
+}
+
+.bc-current {
+  color: #111827;
+  font-weight: 600;
 }
 
 .topbar-right {
@@ -198,12 +348,71 @@ export default defineComponent({
   gap: 16px;
 }
 
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.user-icon {
+  font-size: 16px;
+  color: #0369a1;
+}
+
+.user-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+.user-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #111827;
+}
+
+.user-roles {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.user-roles :deep(.el-tag) {
+  font-size: 12px;
+  height: 20px;
+  padding: 0 6px;
+  line-height: 20px;
+  border-radius: 4px;
+}
+
+:deep(.el-button--default) {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #6b7280;
+  border-radius: 6px;
+  font-size: 14px;
+  padding: 8px 16px;
+  transition: all 200ms ease;
+  height: 32px;
+}
+
+:deep(.el-button--default:hover) {
+  background: #f9fafb;
+  color: #111827;
+  border-color: #9ca3af;
+}
+
+/* ---------- Content ---------- */
+
 .content {
   flex: 1;
   padding: 24px;
   min-width: 0;
-  background: #f4f6f8;
+  background: #f3f4f6;
 }
-
 </style>
-

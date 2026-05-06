@@ -6,19 +6,17 @@ import org.backend.model.Dto.RegisterRequest;
 import org.backend.service.UserService;
 import org.backend.util.JwtUtil;
 import org.backend.util.Result;
-import org.springframework.aop.scope.ScopedProxyUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -39,23 +37,18 @@ public class AuthController {
         String username = loginRequest.get("username");
         String password = loginRequest.get("password");
 
-        System.out.println("登录请求: " + username);
-
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, password)
             );
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("用户名或密码错误");
         }
 
-
-        // 2. 验证通过后生成 Token
+        // 验证通过后生成 Token
         String token = jwtUtil.generateToken(username);
 
-        // 3. 获取自定义用户信息并返回
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
 
         LoginResponse response = new LoginResponse();
@@ -63,8 +56,9 @@ public class AuthController {
         response.setUsername(username);
         response.setUserId(userDetails.getUserId());
         response.setRoleId(userDetails.getRoleId());
+        response.setRealName(userDetails.getRealName());
+        response.setRoles(userDetails.getRoleCodes());
 
-        System.out.println("登录成功: " + username);
         return Result.success(response);
     }
 
@@ -81,5 +75,23 @@ public class AuthController {
         } else {
             return Result.error(errorMsg);
         }
+    }
+
+    /**
+     * 当前登录用户信息(前端 fetchMe 调用)
+     * 不返回 token(token 已在请求头中携带,客户端无需再获取)
+     */
+    @GetMapping("/me")
+    public Result<LoginResponse> me(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (userDetails == null) {
+            return Result.error(401, "未登录");
+        }
+        LoginResponse resp = new LoginResponse();
+        resp.setUserId(userDetails.getUserId());
+        resp.setUsername(userDetails.getUsername());
+        resp.setRealName(userDetails.getRealName());
+        resp.setRoleId(userDetails.getRoleId());
+        resp.setRoles(userDetails.getRoleCodes());
+        return Result.success(resp);
     }
 }

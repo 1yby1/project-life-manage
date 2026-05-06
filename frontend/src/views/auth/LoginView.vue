@@ -1,54 +1,26 @@
 <template>
   <div class="login-wrap">
-    <el-card class="login-card" shadow="always">
-      <template #header>
-        <div class="card-header">
-          <span class="login-title">登录</span>
+    <div class="login-card">
+      <!-- 品牌区 -->
+      <div class="brand">
+        <div class="brand-logo">
+          <el-icon :size="20"><Suitcase /></el-icon>
         </div>
-      </template>
-      <p class="login-sub">演示：支持“后端登录”和“演示角色登录”。</p>
-
-      <div class="mode-row">
-        <el-switch
-          v-model="useDemo"
-          active-text="使用演示角色（本地权限）"
-          inactive-text="后端登录"
-          size="large"
-        />
+        <div class="brand-text">项目全生命周期管理系统</div>
       </div>
 
-      <!-- 演示角色登录 -->
-      <el-form v-if="useDemo" class="demo-form" size="large" @submit.prevent="doDemoLogin">
-        <el-form-item label="选择角色">
-          <el-select v-model="roleLabel" placeholder="请选择角色" style="width: 100%">
-            <el-option value="商机管理员" label="商机管理员" />
-            <el-option value="客户经理" label="客户经理" />
-            <el-option value="合同管理员" label="合同管理员" />
-            <el-option value="线索收集人" label="线索收集人" />
-            <el-option value="线索分发人" label="线索分发人" />
-            <el-option value="客户/线索培育" label="客户/线索培育" />
-            <el-option value="项目经理" label="项目经理" />
-            <el-option value="销售人员" label="销售人员" />
-            <el-option value="销售主管/管理层" label="销售主管/管理层" />
-          </el-select>
-        </el-form-item>
+      <!-- 主标题区 -->
+      <div class="title-block">
+        <h2 class="title">欢迎登录</h2>
+        <p class="subtitle">请使用账号与密码访问系统</p>
+      </div>
 
+      <div class="divider" />
+
+      <!-- 表单 -->
+      <el-form class="login-form" size="large" @submit.prevent="doLogin">
         <el-form-item>
-          <el-button
-            type="primary"
-            :icon="Right"
-            :loading="authState.loading"
-            style="width: 100%"
-            @click="doDemoLogin"
-          >
-            登录
-          </el-button>
-        </el-form-item>
-      </el-form>
-
-      <!-- 后端账号登录 -->
-      <el-form v-else class="demo-form" size="large" @submit.prevent="doLogin">
-        <el-form-item label="账号">
+          <template #label><span class="form-label">账号</span></template>
           <el-input
             v-model="username"
             placeholder="请输入账号"
@@ -58,7 +30,8 @@
           />
         </el-form-item>
 
-        <el-form-item label="密码">
+        <el-form-item>
+          <template #label><span class="form-label">密码</span></template>
           <el-input
             v-model="password"
             placeholder="请输入密码"
@@ -69,102 +42,124 @@
           />
         </el-form-item>
 
-        <el-form-item class="footer-actions">
-          <el-button :icon="HomeFilled" @click="goHome">返回首页</el-button>
+        <el-form-item class="submit-item">
           <el-button
             type="primary"
-            :icon="Right"
+            class="login-btn"
             :loading="authState.loading"
             @click="doLogin"
           >
-            登录
+            <span class="btn-text">{{ authState.loading ? '登录中...' : '登 录' }}</span>
           </el-button>
         </el-form-item>
       </el-form>
 
-      <el-alert
-        v-if="message"
-        :title="message"
-        :type="messageType"
-        show-icon
-        :closable="false"
-        class="login-alert"
-      />
-    </el-card>
+      <!-- 错误提示(inline) -->
+      <div class="error-slot">
+        <span v-if="message" class="error-text">
+          <el-icon class="error-icon"><WarningFilled /></el-icon>
+          {{ message }}
+        </span>
+      </div>
+
+      <!-- 种子账号(可折叠) -->
+      <el-collapse v-model="seedOpen" class="seed-collapse">
+        <el-collapse-item name="seed">
+          <template #title>
+            <span class="seed-title">种子账号(点击展开)</span>
+          </template>
+          <div class="seed-list">
+            <div v-for="acc in seedAccounts" :key="acc.username" class="seed-row">
+              <span class="seed-username">{{ acc.username }}</span>
+              <span class="seed-sep">/</span>
+              <span class="seed-pwd">{{ acc.password }}</span>
+              <span class="seed-role">{{ acc.role }}</span>
+            </div>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
+    </div>
+
+    <div class="footer">© 2026 · 项目全生命周期管理系统 · v1.0</div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ensureUser, getAuthState, login, loginAsDemoRole } from '@/auth/authStore'
-import { User, Lock, Right, HomeFilled } from '@element-plus/icons-vue'
+import { ensureUser, getAuthState, login } from '@/auth/authStore'
+import { getLandingPath } from '@/auth/landing'
+import { User, Lock, Suitcase, WarningFilled } from '@element-plus/icons-vue'
+
+const SEED_ACCOUNTS = [
+  { username: 'admin',     password: '123456', role: '系统管理员' },
+  { username: 'oppadmin',  password: '123456', role: '商机管理员' },
+  { username: 'cm001',     password: '123456', role: '客户经理' },
+  { username: 'sales001',  password: '123456', role: '销售人员' },
+  { username: 'sup001',    password: '123456', role: '主管' },
+  { username: 'pm001',     password: '123456', role: '项目经理' },
+  { username: 'region01',  password: '123456', role: '区总' },
+  { username: 'pmo01',     password: '123456', role: '项目管理部' },
+]
 
 export default defineComponent({
   name: 'LoginView',
-  components: {
-    User,
-    Lock,
-    Right,
-    HomeFilled,
-  },
+  components: { Suitcase, WarningFilled },
   setup() {
     const router = useRouter()
     const route = useRoute()
 
     const authState = getAuthState()
 
-    const useDemo = ref(true)
-    const roleLabel = ref('客户经理')
-
     const username = ref('')
     const password = ref('')
 
     const message = ref('')
-    const messageType = ref<'error' | 'success'>('success')
+    const seedOpen = ref<string[]>([])
+    const seedAccounts = SEED_ACCOUNTS
 
-    const redirectPath = computed(() => String(route.query.redirect || '/'))
+    const explicitRedirect = computed(() => {
+      const r = route.query.redirect
+      return typeof r === 'string' && r ? r : ''
+    })
 
-    const goHome = () => router.push({ path: '/' })
-
-    const doDemoLogin = async () => {
-      await loginAsDemoRole(roleLabel.value)
-      await ensureUser()
-      router.push({ path: redirectPath.value })
-    }
+    // 用户重新输入时清空错误提示
+    watch([username, password], () => {
+      if (message.value) message.value = ''
+    })
 
     const doLogin = async () => {
       message.value = ''
-      const ok = await login(username.value, password.value)
+      if (!username.value.trim() || !password.value) {
+        message.value = '请输入账号和密码'
+        return
+      }
+      const ok = await login(username.value.trim(), password.value)
       if (!ok) {
-        messageType.value = 'error'
-        message.value = '登录失败：请检查账号/密码，或确认后端接口配置'
+        message.value = '登录失败:请检查账号 / 密码,或确认后端接口是否启动'
         return
       }
       const user = await ensureUser()
       if (!user) {
-        messageType.value = 'error'
-        message.value = '登录失败：无法获取当前用户信息'
+        message.value = '登录失败:无法获取当前用户信息'
         return
       }
-      router.push({ path: redirectPath.value })
+      const target = explicitRedirect.value || getLandingPath(user)
+      router.push({ path: target })
     }
 
     return {
       authState,
-      useDemo,
-      roleLabel,
       username,
       password,
-      doDemoLogin,
-      doLogin,
-      goHome,
       message,
-      messageType,
+      seedOpen,
+      seedAccounts,
+      doLogin,
       User,
       Lock,
-      Right,
-      HomeFilled,
+      Suitcase,
+      WarningFilled,
     }
   },
 })
@@ -174,93 +169,280 @@ export default defineComponent({
 .login-wrap {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%);
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%);
+  padding: 24px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
+
+/* ---------- 卡片 ---------- */
 
 .login-card {
-  width: min(480px, 100%);
-  border-radius: 12px;
-  overflow: hidden;
+  width: 440px;
+  max-width: 100%;
+  padding: 36px 32px 28px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow:
+    0 20px 50px -12px rgba(15, 23, 42, 0.12),
+    0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
-.card-header {
+/* ---------- 品牌区 ---------- */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.brand-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #0369a1;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
-.login-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #0F172A;
+.brand-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.3;
 }
 
-.login-sub {
-  text-align: center;
-  color: #334155;
-  margin-bottom: 24px;
-  font-size: 14px;
+/* ---------- 主标题区 ---------- */
+
+.title-block {
+  margin-bottom: 0;
 }
 
-.mode-row {
-  margin-bottom: 24px;
-  display: flex;
-  justify-content: center;
+.title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 6px;
+  line-height: 1.3;
 }
 
-.demo-form {
-  margin-top: 20px;
+.subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
 }
 
-.footer-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+.divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 20px 0;
+}
+
+/* ---------- 表单 ---------- */
+
+.login-form {
+  :deep(.el-form-item) {
+    margin-bottom: 18px;
+  }
+
+  :deep(.el-form-item__label) {
+    line-height: 1.4;
+    padding: 0 0 6px;
+  }
+
+  .form-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+  }
+
+  :deep(.el-input__wrapper) {
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    box-shadow: none;
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+    padding: 1px 11px;
+  }
+
+  :deep(.el-input__wrapper:hover) {
+    border-color: #cbd5e1;
+  }
+
+  :deep(.el-input__wrapper.is-focus) {
+    border-color: #0369a1;
+    box-shadow: 0 0 0 3px rgba(3, 105, 161, 0.12);
+  }
+
+  :deep(.el-input__inner) {
+    height: 40px;
+    color: #0f172a;
+    font-size: 14px;
+  }
+
+  :deep(.el-input__prefix-inner .el-icon) {
+    color: #94a3b8;
+    font-size: 16px;
+    transition: color 200ms ease;
+  }
+
+  :deep(.el-input__wrapper.is-focus .el-input__prefix-inner .el-icon) {
+    color: #0369a1;
+  }
+}
+
+/* ---------- 主按钮 ---------- */
+
+.submit-item {
+  margin-top: 24px !important;
+  margin-bottom: 0 !important;
+
+  :deep(.el-form-item__content) {
+    display: block;
+  }
+}
+
+.login-btn {
   width: 100%;
+  height: 44px;
+  border-radius: 8px;
+  background: #0369a1;
+  border-color: #0369a1;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: background 200ms ease, box-shadow 200ms ease;
+
+  &:hover,
+  &:focus {
+    background: #0284c7;
+    border-color: #0284c7;
+    box-shadow: 0 4px 12px rgba(3, 105, 161, 0.25);
+  }
+
+  &:active {
+    background: #075985;
+    border-color: #075985;
+  }
+
+  .btn-text {
+    font-size: 15px;
+  }
 }
 
-.footer-actions :deep(.el-form-item__content) {
-  flex-wrap: nowrap;
-  gap: 12px;
+/* ---------- 错误提示 ---------- */
+
+.error-slot {
+  min-height: 22px;
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
 }
 
-.footer-actions .el-button {
-  flex: 1;
+.error-text {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #dc2626;
+  line-height: 1.4;
 }
 
-.login-alert {
-  margin-top: 16px;
+.error-icon {
+  font-size: 14px;
+  margin-right: 6px;
+  color: #dc2626;
 }
 
-:deep(.el-card__header) {
-  background: #F8FAFC;
-  border-bottom: 1px solid #E2E8F0;
+/* ---------- 种子账号 ---------- */
+
+.seed-collapse {
+  margin-top: 4px;
+  border: none;
+
+  :deep(.el-collapse-item__header) {
+    height: 32px;
+    line-height: 32px;
+    font-size: 12px;
+    color: #94a3b8;
+    border: none;
+    background: transparent;
+  }
+
+  :deep(.el-collapse-item__header.is-active) {
+    color: #475569;
+  }
+
+  :deep(.el-collapse-item__wrap) {
+    border: none;
+    background: transparent;
+  }
+
+  :deep(.el-collapse-item__content) {
+    padding: 0;
+  }
 }
 
-:deep(.el-button--primary) {
-  background-color: #0369A1;
-  border-color: #0369A1;
+.seed-title {
+  font-size: 12px;
+  color: inherit;
 }
 
-:deep(.el-button--primary:hover) {
-  background-color: #0284C7;
-  border-color: #0284C7;
+.seed-list {
+  margin-top: 4px;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-:deep(.el-switch.is-checked .el-switch__core) {
-  background-color: #0369A1;
-  border-color: #0369A1;
+.seed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+  font-family: 'Fira Code', 'Cascadia Code', Consolas, monospace;
 }
 
-:deep(.el-input__wrapper:focus-within) {
-  box-shadow: 0 0 0 1px #0369A1 inset;
+.seed-username {
+  min-width: 84px;
+  color: #0f172a;
+  font-weight: 500;
 }
 
-:deep(.el-select .el-input.is-focus .el-input__wrapper) {
-  box-shadow: 0 0 0 1px #0369A1 inset !important;
+.seed-sep {
+  color: #cbd5e1;
+}
+
+.seed-pwd {
+  min-width: 60px;
+  color: #64748b;
+}
+
+.seed-role {
+  margin-left: auto;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* ---------- 页脚 ---------- */
+
+.footer {
+  margin-top: 32px;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
 }
 </style>
-

@@ -16,9 +16,20 @@ public class SysUser {
 
     private String realName;
 
+    /** 手机号 */
+    private String phone;
+
+    /** 邮箱 */
+    private String email;
+
+    /** 直属主管 ID, 用于周报点评 */
+    private Long supervisorId;
+
+    /** 主角色 ID(兼容旧代码,实际权限以 sys_user_role 为准) */
     private Long roleId;
 
-    private byte status; // 1正常，0禁用
+    /** 1 正常 / 0 禁用 */
+    private byte status;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

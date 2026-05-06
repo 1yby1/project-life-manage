@@ -5,16 +5,14 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+/**
+ * 用户-角色关系表(支持多角色)
+ */
 @Data
-@TableName("sys_role")
-public class SysRole {
+@TableName("sys_user_role")
+public class SysUserRole {
     @TableId(type = IdType.AUTO)
     private Long id;
-
-    private String roleName;
-
-    private String roleCode;
-
-    /** 角色说明 */
-    private String description;
+    private Long userId;
+    private Long roleId;
 }
