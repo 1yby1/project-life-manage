@@ -1,147 +1,92 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <div class="header-content">
-        <h1 class="page-title">客户列表</h1>
-        <span class="user-role-badge" v-if="isOpportunityManager">商机管理员</span>
-        <span class="user-role-badge" v-if="isCustomerManager">客户经理</span>
-      </div>
+      <h2 class="page-title">客户列表</h2>
       <el-button
-        v-if="isOpportunityManager"
+        v-if="canCreate"
         type="primary"
         :icon="Plus"
         @click="router.push('/customers/create')"
-        class="action-button"
       >
         新建客户
       </el-button>
     </div>
 
-    <el-card class="search-card" shadow="hover">
-      <el-form :inline="true" :model="query" size="large" class="search-form">
+    <el-card class="search-card" shadow="never">
+      <el-form :inline="true" :model="query" class="search-form">
         <el-form-item label="客户名称">
-          <el-input
-            v-model="query.customerName"
-            placeholder="输入客户名称"
-            clearable
-            :prefix-icon="Search"
-          />
+          <el-input v-model="query.keyword" placeholder="客户名/法人/联系人" clearable :prefix-icon="Search" />
         </el-form-item>
         <el-form-item label="地市">
-          <el-input
-            v-model="query.city"
-            placeholder="输入地市"
-            clearable
-            :prefix-icon="Location"
-          />
-        </el-form-item>
-        <el-form-item label="法人">
-          <el-input
-            v-model="query.legalPerson"
-            placeholder="输入法人"
-            clearable
-            :prefix-icon="User"
-          />
+          <el-input v-model="query.city" placeholder="输入地市" clearable :prefix-icon="Location" />
         </el-form-item>
         <el-form-item label="流程阶段">
-          <el-select
-            v-model="query.stage"
-            placeholder="全部"
-            clearable
-            style="width: 180px"
-          >
-            <el-option
-              v-for="s in stages"
-              :key="s"
-              :label="s"
-              :value="s"
-            />
+          <el-select v-model="query.visitStatus" placeholder="全部" clearable style="width: 160px">
+            <el-option label="已录入(未派单)" value="NONE" />
+            <el-option label="已派单" value="PENDING" />
+            <el-option label="走访中" value="DOING" />
+            <el-option label="走访完成" value="COMPLETED" />
           </el-select>
         </el-form-item>
-        <el-form-item class="form-actions">
-          <el-button type="primary" :icon="Search" @click="pageIndex = 1">
-            搜索
-          </el-button>
-          <el-button :icon="RefreshLeft" @click="reset">
-            重置
-          </el-button>
+        <el-form-item>
+          <el-button type="primary" :icon="Search" @click="onSearch">搜索</el-button>
+          <el-button :icon="RefreshLeft" @click="reset">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <el-card class="table-card" shadow="hover">
-      <el-table :data="paged" style="width: 100%" :header-cell-style="{ background: '#f8fafc', color: '#1e293b', fontWeight: 600 }">
-        <el-table-column prop="customerName" label="客户名称" min-width="180">
+    <el-card class="table-card" shadow="never" v-loading="loading">
+      <el-table :data="rows" stripe style="width: 100%">
+        <el-table-column prop="customerName" label="客户名称" min-width="200">
           <template #default="{ row }">
             <span class="company-name">{{ row.customerName }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="city" label="地市" min-width="120" />
-        <el-table-column prop="legalPerson" label="法人" min-width="120" />
-        <el-table-column label="流程阶段" min-width="120">
+        <el-table-column prop="city" label="地市" width="120" />
+        <el-table-column prop="legalPerson" label="法人" width="120" />
+        <el-table-column label="流程阶段" width="140">
           <template #default="{ row }">
-            <el-tag :type="getStageType(row.stage)" effect="plain">
-              {{ row.stage }}
+            <el-tag :type="visitStageTagType(row.visitStatus)" effect="light" round>
+              {{ visitStatusToStage(row.visitStatus) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="260" fixed="right">
+        <el-table-column label="客户经理" width="120">
           <template #default="{ row }">
-            <div class="table-actions">
-              <el-button
-                type="primary"
-                :icon="View"
-                size="small"
-                link
-                @click="toDetail(row.id)"
-              >
-                查看
-              </el-button>
-              <el-button
-                v-if="isOpportunityManager && row.stage === '已录入'"
-                type="success"
-                :icon="Position"
-                size="small"
-                link
-                @click="toDispatch(row.id)"
-              >
-                派单
-              </el-button>
-              <el-button
-                v-if="isCustomerManager && (row.stage === '已派单' || row.stage === '走访中')"
-                type="warning"
-                :icon="LocationInformation"
-                size="small"
-                link
-                @click="toVisits(row.id)"
-              >
-                走访
-              </el-button>
-              <el-button
-                v-if="isCustomerManager && row.stage !== '已录入'"
-                type="info"
-                :icon="Edit"
-                size="small"
-                link
-                @click="toComplete(row.id)"
-              >
-                完善
-              </el-button>
-            </div>
+            <span v-if="row.assignedManagerName">{{ row.assignedManagerName }}</span>
+            <span v-else class="muted">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" min-width="280" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" :icon="View" @click="toDetail(row.id)">查看</el-button>
+            <template v-if="isOpportunityManager && !row.visitStatus">
+              <el-divider direction="vertical" />
+              <el-button link type="success" :icon="Position" @click="toDispatch(row.id)">派单</el-button>
+            </template>
+            <template v-if="isCustomerManager && (row.visitStatus === 'PENDING' || row.visitStatus === 'DOING')">
+              <el-divider direction="vertical" />
+              <el-button link type="warning" :icon="LocationInformation" @click="toVisits(row.id)">走访</el-button>
+            </template>
+            <template v-if="isCustomerManager && row.visitStatus">
+              <el-divider direction="vertical" />
+              <el-button link type="primary" :icon="Edit" @click="toComplete(row.id)">完善</el-button>
+            </template>
           </template>
         </el-table-column>
         <template #empty>
-          <el-empty description="暂无数据" />
+          <el-empty description="暂无数据" :image-size="80" />
         </template>
       </el-table>
 
       <div class="pagination-wrapper">
         <el-pagination
-          v-model:current-page="pageIndex"
+          :current-page="pageIndex"
           :page-size="pageSize"
-          :total="filtered.length"
+          :total="total"
           layout="total, prev, pager, next, jumper"
           background
+          @update:current-page="onPageChange"
         />
       </div>
     </el-card>
@@ -149,113 +94,93 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, reactive, ref } from 'vue'
-import { useMockStore } from '@/store/mockStore'
+import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { CustomerStage } from '@/store/mockStore'
+import { ElMessage } from 'element-plus'
+import { customerApi, Customer, VisitStatus } from '@/api/customer'
+import { getAuthState } from '@/auth/authStore'
+import { visitStatusToStage, visitStageTagType } from '@/utils/visitRecord'
 import {
-  User,
-  Plus,
-  Search,
-  Location,
-  RefreshLeft,
-  View,
-  Position,
-  LocationInformation,
-  Edit,
+  Plus, Search, Location, RefreshLeft, View, Position, LocationInformation, Edit,
 } from '@element-plus/icons-vue'
 
 export default defineComponent({
   name: 'CustomerListView',
-  components: {
-    User,
-    Plus,
-    Search,
-    Location,
-    RefreshLeft,
-    View,
-    Position,
-    LocationInformation,
-    Edit,
-  },
   setup() {
-    const store = useMockStore()
     const router = useRouter()
+    const authState = getAuthState()
 
-    const roleLabel = window.localStorage.getItem('demo_role') || '商机管理员'
-    const isOpportunityManager = computed(() => roleLabel === '商机管理员')
-    const isCustomerManager = computed(() => roleLabel === '客户经理')
-
-    const stages: CustomerStage[] = ['已录入', '已派单', '走访中', '走访完成']
+    const isOpportunityManager = computed(() => (authState.user?.roles || []).indexOf('OPP_ADMIN') !== -1)
+    const isCustomerManager = computed(() => (authState.user?.roles || []).indexOf('CUSTOMER_MANAGER') !== -1)
+    const canCreate = computed(() => isOpportunityManager.value)
 
     const query = reactive({
-      customerName: '',
+      keyword: '',
       city: '',
-      legalPerson: '',
-      stage: '' as string,
+      visitStatus: '' as '' | VisitStatus | 'NONE',
     })
 
-    const pageSize = 8
+    const pageSize = 10
     const pageIndex = ref(1)
+    const total = ref(0)
+    const rows = ref<Customer[]>([])
+    const loading = ref(false)
 
-    const filtered = computed(() => {
-      return store.customers.filter((c) => {
-        const okName = query.customerName ? c.customerName.includes(query.customerName) : true
-        const okCity = query.city ? c.city.includes(query.city) : true
-        const okLegal = query.legalPerson ? c.legalPerson.includes(query.legalPerson) : true
-        const okStage = query.stage ? c.stage === query.stage : true
-        return okName && okCity && okLegal && okStage
-      })
-    })
+    const load = async () => {
+      loading.value = true
+      try {
+        const res = await customerApi.list({
+          page: pageIndex.value,
+          size: pageSize,
+          keyword: query.keyword || undefined,
+          city: query.city || undefined,
+          visitStatus: query.visitStatus || undefined,
+        })
+        rows.value = res.records || []
+        total.value = res.total || 0
+      } catch (e: any) {
+        ElMessage.error(e?.message || '加载客户列表失败')
+        rows.value = []
+        total.value = 0
+      } finally {
+        loading.value = false
+      }
+    }
 
-    const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
+    const onSearch = () => {
+      pageIndex.value = 1
+      load()
+    }
 
-    const paged = computed(() => {
-      const start = (pageIndex.value - 1) * pageSize
-      return filtered.value.slice(start, start + pageSize)
-    })
+    const onPageChange = (p: number) => {
+      pageIndex.value = p
+      load()
+    }
 
     const reset = () => {
-      query.customerName = ''
+      query.keyword = ''
       query.city = ''
-      query.legalPerson = ''
-      query.stage = ''
+      query.visitStatus = ''
       pageIndex.value = 1
+      load()
     }
 
-    const toDetail = (customerId: string) => {
-      router.push({ path: `/customers/${customerId}` })
-    }
+    onMounted(load)
 
-    const toDispatch = (customerId: string) => {
-      router.push({ path: '/customers/dispatch', query: { customerId } })
-    }
-
-    const toVisits = (customerId: string) => {
-      router.push({ path: '/customers/visits', query: { customerId } })
-    }
-
-    const toComplete = (customerId: string) => {
-      router.push({ path: '/customers/complete', query: { customerId } })
-    }
-
-    const getStageType = (stage: CustomerStage) => {
-      const typeMap: Record<CustomerStage, 'info' | 'warning' | 'success' | ''> = {
-        '已录入': 'info',
-        '已派单': 'warning',
-        '走访中': '',
-        '走访完成': 'success',
-      }
-      return typeMap[stage] || 'info'
-    }
+    const toDetail = (id: number) => router.push({ path: `/customers/${id}` })
+    const toDispatch = (id: number) => router.push({ path: '/customers/dispatch', query: { customerId: String(id) } })
+    const toVisits = (id: number) => router.push({ path: '/customers/visits', query: { customerId: String(id) } })
+    const toComplete = (id: number) => router.push({ path: '/customers/complete', query: { customerId: String(id) } })
 
     return {
       query,
       pageIndex,
       pageSize,
-      totalPages,
-      paged,
-      filtered,
+      total,
+      rows,
+      loading,
+      onSearch,
+      onPageChange,
       reset,
       toDetail,
       toDispatch,
@@ -263,18 +188,11 @@ export default defineComponent({
       toComplete,
       isOpportunityManager,
       isCustomerManager,
-      stages,
-      getStageType,
+      canCreate,
+      visitStatusToStage,
+      visitStageTagType,
       router,
-      User,
-      Plus,
-      Search,
-      Location,
-      RefreshLeft,
-      View,
-      Position,
-      LocationInformation,
-      Edit,
+      Plus, Search, Location, RefreshLeft, View, Position, LocationInformation, Edit,
     }
   },
 })
@@ -282,117 +200,109 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .page {
-  padding: 32px;
-  background: #f8fafc;
-  min-height: 100vh;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 32px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.header-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .page-title {
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 600;
-  color: #0f172a;
+  color: #111827;
   margin: 0;
-  letter-spacing: -0.5px;
 }
 
-.user-role-badge {
-  background: #f1f5f9;
-  color: #64748b;
-  padding: 4px 12px;
-  border-radius: 100px;
-  font-size: 14px;
-  font-weight: 500;
-  border: 1px solid #e2e8f0;
-}
-
-.action-button {
-  padding: 10px 20px;
-  height: auto;
-  border-radius: 8px;
-  font-weight: 500;
-}
-
-.search-card, .table-card {
+.search-card {
   margin-bottom: 24px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+
+  :deep(.el-card__body) {
+    padding: 16px 24px;
+  }
 }
 
 .search-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-
   :deep(.el-form-item) {
     margin-bottom: 0;
-    margin-right: 12px;
+    margin-right: 16px;
   }
 
   :deep(.el-form-item__label) {
-    font-weight: 500;
-    color: #475569;
+    color: #6b7280;
+    font-size: 14px;
+    font-weight: 400;
   }
 
-  :deep(.el-input__wrapper), :deep(.el-select__wrapper) {
-    border-radius: 8px;
-    box-shadow: 0 0 0 1px #e2e8f0 inset;
-    background-color: #f8fafc;
+  :deep(.el-input) {
+    width: 200px;
+  }
+}
 
-    &:hover, &.is-focus {
-      box-shadow: 0 0 0 1px #0ea5e9 inset;
-      background-color: #ffffff;
-    }
+.table-card {
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+
+  :deep(.el-card__body) {
+    padding: 0;
+  }
+
+  :deep(.el-table th.el-table__cell) {
+    background: #f9fafb !important;
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  :deep(.el-table td.el-table__cell) {
+    font-size: 14px;
+    color: #111827;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  :deep(.el-table__row) {
+    cursor: pointer;
+    transition: background-color 200ms ease;
+  }
+
+  :deep(.el-table__body tr:hover > td.el-table__cell) {
+    background-color: #f3f4f6 !important;
   }
 }
 
 .company-name {
   font-weight: 600;
-  color: #0f172a;
+  color: #111827;
 }
 
-.table-actions {
-  display: flex;
-  gap: 16px;
-
-  :deep(.el-button) {
-    padding: 0;
-    font-weight: 500;
-
-    &.el-button--primary.is-link {
-      color: #0ea5e9;
-      &:hover { color: #0284c7; }
-    }
-  }
+.muted {
+  color: #9ca3af;
 }
 
 .pagination-wrapper {
   display: flex;
   justify-content: flex-end;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #f1f5f9;
+  padding: 16px 24px;
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  border-radius: 0 0 8px 8px;
+}
+
+:deep(.el-button) {
+  border-radius: 6px;
+  font-size: 14px;
 }
 
 :deep(.el-button--primary:not(.is-link)) {
-  background-color: #0ea5e9;
-  border-color: #0ea5e9;
+  background-color: #0369a1;
+  border-color: #0369a1;
 
   &:hover {
     background-color: #0284c7;
@@ -400,22 +310,18 @@ export default defineComponent({
   }
 }
 
-:deep(.el-tag) {
-  border-radius: 6px;
-  font-weight: 500;
-  padding: 4px 8px;
-  border: none;
+:deep(.el-button--primary.is-link) {
+  color: #0369a1;
+
+  &:hover {
+    color: #0284c7;
+  }
 }
 
-:deep(.el-tag--info) { background-color: #f1f5f9; color: #475569; }
-:deep(.el-tag--warning) { background-color: #fef3c7; color: #d97706; }
-:deep(.el-tag--success) { background-color: #dcfce7; color: #16a34a; }
-
 @media (max-width: 768px) {
-  .page { padding: 16px; }
   .page-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 16px;
   }
 }

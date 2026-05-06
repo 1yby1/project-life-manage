@@ -12,9 +12,18 @@ public class CrmCustomerVisit {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long customerId;
+    /** 被派单的客户经理 */
     private Long managerId;
+    /** 派单人(商机管理员) */
+    private Long assignBy;
+    /** 走访记录,走访完成前可多次更新 */
     private String visitRecord;
-    private Integer status; // 0待走访，1已完成
+    /** PENDING 待走访 / DOING 走访中 / COMPLETED 已完成(不可逆) */
+    private String status;
+    /** 派单时间 */
+    private LocalDateTime assignTime;
+    /** 完成走访时间 */
     private LocalDateTime visitTime;
     private LocalDateTime createTime;
+    private LocalDateTime updateTime;
 }

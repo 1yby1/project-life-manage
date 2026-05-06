@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class CrmCustomer {
     @TableId(type = IdType.AUTO)
     private Long id;
+
     private String customerName;
     private String city;
     private String legalPerson;
@@ -22,7 +23,12 @@ public class CrmCustomer {
     private String contactName;
     private String contactPhone;
     private String contactTitle;
+    /** 业务单元 (BU) */
+    private String bu;
+    /** 1 有效 / 0 失效,默认 1 */
+    private Integer status;
+    /** 创建人 (商机管理员 user_id) */
     private Long createBy;
     private LocalDateTime createTime;
+    private LocalDateTime updateTime;
 }
-
