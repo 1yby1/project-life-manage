@@ -45,7 +45,7 @@
             合同正文附件
           </div>
           <el-link :href="contract.fileUrl" target="_blank" type="primary">
-            {{ contract.fileUrl }}
+            下载附件
           </el-link>
         </div>
       </el-card>
@@ -140,38 +140,108 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.page { max-width: 1200px; margin: 0 auto; }
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 .page-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
 }
-.page-title { font-size: 18px; font-weight: 600; color: #0F172A; margin: 0; }
-.summary-card, .payment-card {
-  border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 16px;
+
+.page-title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
 }
-.summary-card :deep(.el-card__body) { padding: 16px 20px; }
+
+.summary-card,
+.payment-card {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  margin-bottom: var(--space-4);
+}
+
+.summary-card :deep(.el-card__body) {
+  padding: var(--space-4) var(--space-6);
+}
+
 .payment-card :deep(.el-card__header) {
-  padding: 14px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-bg-soft);
+  border-bottom: 1px solid var(--color-border);
 }
-.payment-card :deep(.el-card__body) { padding: 0; }
-.card-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: #0F172A; }
-.card-meta { color: #64748B; font-weight: 400; font-size: 13px; }
-.contract-name { font-weight: 600; color: #0F172A; }
-.amount { font-family: 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; }
-.text-success { color: #059669; }
-.muted { color: #94A3B8; }
+
+.payment-card :deep(.el-card__body) {
+  padding: 0;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+.card-meta {
+  color: var(--color-text-tertiary);
+  font-weight: var(--weight-normal);
+  font-size: var(--text-sm);
+}
+
+.contract-name {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.amount {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+}
+
+.text-success {
+  color: var(--color-success);
+}
+
+.muted {
+  color: var(--color-text-disabled);
+}
+
 .file-block {
-  margin-top: 16px; padding: 12px 16px; background: #F0F9FF;
-  border: 1px solid #BAE6FD; border-radius: 8px;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-md);
 }
+
 .file-label {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 13px; color: #0369A1; margin-bottom: 6px; font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+  font-weight: var(--weight-medium);
 }
+
 :deep(.el-descriptions__label) {
-  width: 110px; background: #F8FAFC !important;
-  color: #475569 !important; font-weight: 500 !important;
+  width: 110px;
+  background: var(--color-bg-soft) !important;
+  color: var(--color-text-secondary) !important;
+  font-weight: var(--weight-medium) !important;
 }
+
 :deep(.el-table th.el-table__cell) {
-  background: #F8FAFC !important; color: #0F172A; font-weight: 600; font-size: 13px;
+  background: var(--color-bg-soft) !important;
+  color: var(--color-text-primary);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
 }
 </style>

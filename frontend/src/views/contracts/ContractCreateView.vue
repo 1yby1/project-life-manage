@@ -5,29 +5,29 @@
       <el-button :icon="ArrowLeft" @click="$router.push('/contracts/list')">返回列表</el-button>
     </div>
 
-    <el-card class="form-card" shadow="never">
-      <template #header>
-        <div class="card-title">
-          <el-icon><Document /></el-icon>
-          合同基本信息
-          <span class="card-meta">— 合同名称需全局唯一,合同金额必须等于付款节点之和</span>
-        </div>
-      </template>
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+      <el-card class="form-card" shadow="never">
+        <template #header>
+          <div class="card-title">
+            <el-icon><Document /></el-icon>
+            合同基本信息
+            <span class="card-meta">— 合同名称需全局唯一,合同金额必须等于付款节点之和</span>
+          </div>
+        </template>
 
-      <el-form :model="form" label-position="top">
         <el-row :gutter="16">
           <el-col :xs="24" :md="12">
-            <el-form-item label="合同名称" required>
+            <el-form-item label="合同名称" prop="contractName">
               <el-input v-model="form.contractName" placeholder="请输入合同名称(全局唯一)" clearable />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :md="12">
-            <el-form-item label="客户" required>
+            <el-form-item label="客户" prop="customerId">
               <el-select
                 v-model="form.customerId"
                 placeholder="请选择客户"
                 filterable
-                style="width: 100%"
+                class="full-width-control"
                 :loading="customerLoading"
               >
                 <el-option v-for="c in customers" :key="c.id" :label="c.customerName" :value="c.id" />
@@ -36,7 +36,7 @@
           </el-col>
           <el-col :xs="24" :md="8">
             <el-form-item label="合同类型">
-              <el-select v-model="form.contractType" placeholder="选择类型" clearable style="width: 100%">
+              <el-select v-model="form.contractType" placeholder="选择类型" clearable class="full-width-control">
                 <el-option label="服务合同" value="服务合同" />
                 <el-option label="产品销售" value="产品销售" />
                 <el-option label="解决方案" value="解决方案" />
@@ -45,13 +45,13 @@
             </el-form-item>
           </el-col>
           <el-col :xs="24" :md="8">
-            <el-form-item label="合同年份" required>
-              <el-input-number v-model="form.contractYear" :min="2019" :max="2099" controls-position="right" style="width: 100%" />
+            <el-form-item label="合同年份" prop="contractYear">
+              <el-input-number v-model="form.contractYear" :min="2019" :max="2099" controls-position="right" class="full-width-control" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :md="8">
-            <el-form-item label="合同总金额(元)" required>
-              <el-input-number v-model="form.totalAmount" :min="0" :step="10000" :precision="2" controls-position="right" style="width: 100%" />
+            <el-form-item label="合同总金额(元)" prop="totalAmount">
+              <el-input-number v-model="form.totalAmount" :min="0" :step="10000" :precision="2" controls-position="right" class="full-width-control" />
             </el-form-item>
           </el-col>
           <el-col :xs="24">
@@ -67,7 +67,7 @@
                   <div class="upload-tip">
                     <span v-if="form.fileUrl" class="uploaded">
                       已上传:
-                      <el-link :href="form.fileUrl" target="_blank" type="primary">{{ uploadedName || form.fileUrl }}</el-link>
+                      <el-link :href="form.fileUrl" target="_blank" type="primary">{{ uploadedName || '附件' }}</el-link>
                       <el-button :icon="Delete" link type="danger" size="small" @click="clearUpload">移除</el-button>
                     </span>
                     <span v-else class="upload-hint">
@@ -79,45 +79,77 @@
             </el-form-item>
           </el-col>
         </el-row>
-      </el-form>
-    </el-card>
+      </el-card>
 
-    <el-card class="form-card" shadow="never">
-      <template #header>
-        <div class="card-title">
-          <el-icon><Money /></el-icon>
-          付款节点
-          <span class="card-meta">— 已配置 {{ form.paymentNodes.length }} 个,合计 {{ formatMoney(nodesSum) }} <span :class="amountMatchClass">/ {{ formatMoney(form.totalAmount) }}</span></span>
+      <el-card class="form-card" shadow="never">
+        <template #header>
+          <div class="card-title">
+            <el-icon><Money /></el-icon>
+            付款节点
+            <span class="card-meta">
+              — 已配置 {{ form.paymentNodes.length }} 个,合计 {{ formatMoney(nodesSum) }}
+              <span :class="amountMatchClass">/ {{ formatMoney(form.totalAmount) }}</span>
+              <el-icon v-if="amountMatch" class="match-icon match-icon--ok"><CircleCheckFilled /></el-icon>
+              <el-icon v-else class="match-icon match-icon--err"><WarningFilled /></el-icon>
+            </span>
+          </div>
+        </template>
+
+        <el-table :data="form.paymentNodes" stripe>
+          <el-table-column label="节点名称" min-width="200">
+            <template #default="{ row, $index }">
+              <el-form-item
+                :prop="`paymentNodes.${$index}.nodeName`"
+                :rules="nodeNameRule"
+                class="row-form-item"
+              >
+                <el-input v-model="row.nodeName" placeholder="例如:首付款" />
+              </el-form-item>
+            </template>
+          </el-table-column>
+          <el-table-column label="计划金额(元)" width="220">
+            <template #default="{ row, $index }">
+              <el-form-item
+                :prop="`paymentNodes.${$index}.planAmount`"
+                :rules="planAmountRule"
+                class="row-form-item"
+              >
+                <el-input-number
+                  v-model="row.planAmount"
+                  :min="0"
+                  :step="1000"
+                  :precision="2"
+                  controls-position="right"
+                  class="full-width-control"
+                />
+              </el-form-item>
+            </template>
+          </el-table-column>
+          <el-table-column label="计划日期" width="180">
+            <template #default="{ row }">
+              <el-date-picker v-model="row.planDate" type="date" value-format="YYYY-MM-DD" class="full-width-control" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="80" fixed="right">
+            <template #default="{ $index }">
+              <el-button type="danger" :icon="Delete" size="small" circle @click="removeNode($index)" />
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="add-node-row">
+          <el-button :icon="Plus" @click="addNode">新增付款节点</el-button>
         </div>
-      </template>
-
-      <el-table :data="form.paymentNodes" stripe>
-        <el-table-column label="节点名称" min-width="180">
-          <template #default="{ row }">
-            <el-input v-model="row.nodeName" placeholder="例如:首付款" />
-          </template>
-        </el-table-column>
-        <el-table-column label="计划金额(元)" width="200">
-          <template #default="{ row }">
-            <el-input-number v-model="row.planAmount" :min="0" :step="1000" :precision="2" controls-position="right" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="计划日期" width="180">
-          <template #default="{ row }">
-            <el-date-picker v-model="row.planDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
-          <template #default="{ $index }">
-            <el-button type="danger" :icon="Delete" size="small" circle @click="removeNode($index)" />
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="add-node-row">
-        <el-button :icon="Plus" @click="addNode">新增付款节点</el-button>
-      </div>
-    </el-card>
+        <div v-if="form.paymentNodes.length === 0" class="nodes-empty-hint">
+          <el-icon><WarningFilled /></el-icon>
+          至少添加一个付款节点
+        </div>
+        <div v-else-if="!amountMatch" class="nodes-amount-hint">
+          <el-icon><WarningFilled /></el-icon>
+          付款节点之和({{ formatMoney(nodesSum) }})必须等于合同总额({{ formatMoney(form.totalAmount) }})
+        </div>
+      </el-card>
+    </el-form>
 
     <div class="footer-actions">
       <el-button @click="$router.push('/contracts/list')">取消</el-button>
@@ -129,10 +161,11 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { ArrowLeft, Document, Money, Plus, Delete, Check, Upload } from '@element-plus/icons-vue'
+import { ElMessage, FormInstance, FormRules } from 'element-plus'
+import { ArrowLeft, Document, Money, Plus, Delete, Check, Upload, CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue'
 import { contractApi, formatMoney, PaymentNodeRequest } from '@/api/contract'
 import { customerApi, Customer } from '@/api/customer'
+import { fileApi } from '@/api/file'
 
 export default defineComponent({
   name: 'ContractCreateView',
@@ -152,7 +185,45 @@ export default defineComponent({
       paymentNodes: [] as PaymentNodeRequest[],
     })
 
+    const formRef = ref<FormInstance>()
     const submitting = ref(false)
+
+    const rules: FormRules = {
+      contractName: [
+        { required: true, message: '请填写合同名称', trigger: 'blur' },
+      ],
+      customerId: [
+        { required: true, message: '请选择客户', trigger: 'change' },
+      ],
+      contractYear: [
+        { required: true, message: '请填写合同年份', trigger: 'blur' },
+      ],
+      totalAmount: [
+        { required: true, message: '请填写合同金额', trigger: 'blur' },
+        {
+          validator: (_r, value, cb) => {
+            if (!value || Number(value) <= 0) cb(new Error('合同金额必须大于 0'))
+            else cb()
+          },
+          trigger: 'blur',
+        },
+      ],
+    }
+
+    /** 付款节点字段级 inline 校验规则(动态数组项共用) */
+    const nodeNameRule = [
+      { required: true, message: '节点名称必填', trigger: 'blur' },
+    ]
+    const planAmountRule = [
+      { required: true, message: '金额必填', trigger: 'blur' },
+      {
+        validator: (_r: any, value: any, cb: (e?: Error) => void) => {
+          if (!value || Number(value) <= 0) cb(new Error('金额必须大于 0'))
+          else cb()
+        },
+        trigger: 'blur',
+      },
+    ]
 
     /** 文件上传(POST /files/upload, OPP_ADMIN) */
     const uploading = ref(false)
@@ -167,26 +238,9 @@ export default defineComponent({
     const customUpload = async ({ file }: { file: File }) => {
       uploading.value = true
       try {
-        const fd = new FormData()
-        fd.append('file', file)
-        fd.append('category', 'contracts')
-        const token = window.localStorage.getItem('auth_token') || ''
-        const res = await fetch('/api/files/upload', {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: fd,
-        })
-        const body = await res.json()
-        if (res.status === 401 || res.status === 403) {
-          ElMessage.error('未登录或无权上传(仅 OPP_ADMIN)')
-          return
-        }
-        if (body.code !== 200) {
-          ElMessage.error(body.message || '上传失败')
-          return
-        }
-        form.fileUrl = body.data.url
-        uploadedName.value = body.data.originalName
+        const result = await fileApi.upload(file, 'contracts')
+        form.fileUrl = result.url
+        uploadedName.value = result.originalName
         ElMessage.success('上传成功')
       } catch (e: any) {
         ElMessage.error(e?.message || '上传失败')
@@ -224,34 +278,17 @@ export default defineComponent({
     const amountMatchClass = computed(() => amountMatch.value ? 'text-success' : 'text-error')
 
     const submit = async () => {
-      if (!form.contractName.trim()) {
-        ElMessage.error('请填写合同名称')
-        return
-      }
-      if (!form.customerId) {
-        ElMessage.error('请选择客户')
-        return
-      }
-      if (!form.totalAmount || form.totalAmount <= 0) {
-        ElMessage.error('请填写合同金额')
+      const valid = await formRef.value?.validate().catch(() => false)
+      if (!valid) {
+        ElMessage.error('请检查表单必填项')
         return
       }
       if (form.paymentNodes.length === 0) {
         ElMessage.error('至少添加一个付款节点')
         return
       }
-      for (const n of form.paymentNodes) {
-        if (!n.nodeName || !n.nodeName.trim()) {
-          ElMessage.error('付款节点名称必填')
-          return
-        }
-        if (!n.planAmount || n.planAmount <= 0) {
-          ElMessage.error('付款节点金额必须大于 0')
-          return
-        }
-      }
       if (!amountMatch.value) {
-        ElMessage.error(`付款节点之和(${formatMoney(nodesSum.value)})必须等于合同总额(${formatMoney(form.totalAmount)})`)
+        ElMessage.error('付款节点之和必须等于合同总额')
         return
       }
 
@@ -259,7 +296,7 @@ export default defineComponent({
       try {
         await contractApi.create({
           contractName: form.contractName.trim(),
-          customerId: form.customerId,
+          customerId: form.customerId!,
           contractType: form.contractType || undefined,
           contractYear: form.contractYear,
           totalAmount: form.totalAmount,
@@ -282,42 +319,132 @@ export default defineComponent({
 
     return {
       customers, customerLoading,
-      form, submitting,
+      form, formRef, rules, nodeNameRule, planAmountRule, submitting,
       nodesSum, amountMatch, amountMatchClass,
       uploading, uploadedName, beforeUpload, customUpload, clearUpload,
       addNode, removeNode, submit,
       formatMoney,
-      ArrowLeft, Document, Money, Plus, Delete, Check, Upload,
+      ArrowLeft, Document, Money, Plus, Delete, Check, Upload, CircleCheckFilled, WarningFilled,
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.page { max-width: 1200px; margin: 0 auto; }
-.page-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
 }
-.page-title { font-size: 18px; font-weight: 600; color: #0F172A; margin: 0; }
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.page-title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
 .form-card {
-  border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 16px;
-  :deep(.el-card__header) { padding: 14px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
-  :deep(.el-card__body) { padding: 20px; }
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  margin-bottom: var(--space-4);
+
+  :deep(.el-card__header) {
+    padding: var(--space-3) var(--space-6);
+    background: var(--color-bg-soft);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  :deep(.el-card__body) {
+    padding: var(--space-6);
+  }
+
   :deep(.el-table th.el-table__cell) {
-    background: #F8FAFC !important; color: #0F172A; font-weight: 600; font-size: 13px;
+    background: var(--color-bg-soft) !important;
+    color: var(--color-text-primary);
+    font-weight: var(--weight-semibold);
+    font-size: var(--text-sm);
   }
 }
-.card-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: #0F172A; }
-.card-meta { color: #64748B; font-weight: 400; font-size: 13px; }
-.add-node-row { padding: 12px; }
-.footer-actions {
-  display: flex; justify-content: flex-end; gap: 12px;
-  margin-top: 16px; padding-top: 16px; border-top: 1px solid #E2E8F0;
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
 }
-.text-success { color: #059669; font-weight: 600; }
-.text-error { color: #DC2626; font-weight: 600; }
-:deep(.el-button--primary) {
-  background-color: #0369A1; border-color: #0369A1;
-  &:hover { background-color: #0284C7; border-color: #0284C7; }
+
+.card-meta {
+  color: var(--color-text-tertiary);
+  font-weight: var(--weight-normal);
+  font-size: var(--text-sm);
+}
+
+.match-icon {
+  margin-left: var(--space-1);
+  vertical-align: middle;
+
+  &--ok  { color: var(--color-success); }
+  &--err { color: var(--color-error); }
+}
+
+.add-node-row {
+  padding: var(--space-3);
+}
+
+/* 表格内 form-item:去掉默认下边距,让错误提示紧贴在控件下方而不撑高行 */
+.row-form-item {
+  margin-bottom: 0;
+
+  :deep(.el-form-item__error) {
+    position: relative;
+    padding-top: var(--space-1);
+  }
+}
+
+.nodes-empty-hint,
+.nodes-amount-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-error);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.full-width-control {
+  width: 100%;
+}
+
+.upload-tip {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.text-success {
+  color: var(--color-success);
+  font-weight: var(--weight-semibold);
+}
+
+.text-error {
+  color: var(--color-error);
+  font-weight: var(--weight-semibold);
 }
 </style>

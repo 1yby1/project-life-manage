@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python \"C:\\\\Users\\\\yby\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"login authentication form\" --domain ux -n 8)",
+      "Bash(python \"C:\\\\Users\\\\yby\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"dashboard chart real-time data visualization\" --domain chart -n 8)",
+      "Bash(python \"C:\\\\Users\\\\yby\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"table data dense list\" --domain ux -n 8)",
+      "Bash(./mvnw.cmd compile *)",
+      "Bash(npm install *)"
+    ]
+  }
+}

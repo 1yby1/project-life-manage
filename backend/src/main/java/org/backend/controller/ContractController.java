@@ -1,9 +1,12 @@
 package org.backend.controller;
 
 import org.backend.model.CustomUserDetails;
+import org.backend.model.Dto.PageResult;
 import org.backend.model.Dto.contract.ContractCreateRequest;
 import org.backend.model.Dto.contract.ContractDetailDto;
+import org.backend.model.Dto.contract.ContractDimensionAggregate;
 import org.backend.model.Dto.contract.ContractListItemDto;
+import org.backend.model.Dto.contract.ContractTopicPageResult;
 import org.backend.service.ContractService;
 import org.backend.util.Result;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,13 +24,15 @@ public class ContractController {
     private ContractService contractService;
 
     @GetMapping
-    public Result<List<ContractListItemDto>> list(
+    public Result<PageResult<ContractListItemDto>> list(
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "10") long size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String bu) {
-        return Result.success(contractService.list(keyword, customerName, status, year, bu));
+        return Result.success(contractService.list(page, size, keyword, customerName, status, year, bu));
     }
 
     @GetMapping("/{id}")
@@ -86,18 +91,38 @@ public class ContractController {
     /** 在途合同专题(REGION_HEAD: status=EXECUTING) */
     @GetMapping("/in-flight")
     @PreAuthorize("hasAnyRole('REGION_HEAD', 'OPP_ADMIN', 'ADMIN')")
-    public Result<List<ContractListItemDto>> inFlight(
+    public Result<ContractTopicPageResult> inFlight(
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "10") long size,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String bu) {
-        return Result.success(contractService.listInFlight(year, bu));
+        return Result.success(contractService.listInFlight(page, size, year, bu));
     }
 
     /** 已验收项目专题(PMO: status=COMPLETED) */
     @GetMapping("/accepted")
     @PreAuthorize("hasAnyRole('PMO', 'OPP_ADMIN', 'ADMIN')")
-    public Result<List<ContractListItemDto>> accepted(
+    public Result<ContractTopicPageResult> accepted(
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "10") long size,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String bu) {
-        return Result.success(contractService.listAccepted(year, bu));
+        return Result.success(contractService.listAccepted(page, size, year, bu));
+    }
+
+    /** 已验收专题按年度聚合(用于柱状图) */
+    @GetMapping("/accepted/by-year")
+    @PreAuthorize("hasAnyRole('PMO', 'OPP_ADMIN', 'ADMIN')")
+    public Result<List<ContractDimensionAggregate>> acceptedByYear(
+            @RequestParam(required = false) String bu) {
+        return Result.success(contractService.acceptedAggregateByYear(bu));
+    }
+
+    /** 在途专题按 BU 聚合(用于堆叠柱状图) */
+    @GetMapping("/in-flight/by-bu")
+    @PreAuthorize("hasAnyRole('REGION_HEAD', 'OPP_ADMIN', 'ADMIN')")
+    public Result<List<ContractDimensionAggregate>> inFlightByBu(
+            @RequestParam(required = false) Integer year) {
+        return Result.success(contractService.inFlightAggregateByBu(year));
     }
 }

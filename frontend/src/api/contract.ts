@@ -59,6 +59,8 @@ export type ContractCreateRequest = {
 }
 
 export type ContractListQuery = {
+  page?: number
+  size?: number
   keyword?: string
   customerName?: string
   status?: ContractStatus
@@ -66,9 +68,46 @@ export type ContractListQuery = {
   bu?: string
 }
 
+export type ContractListResponse = {
+  records: Contract[]
+  total: number
+}
+
+export type ContractTopicQuery = {
+  page?: number
+  size?: number
+  year?: number
+  bu?: string
+}
+
+export type ContractTopicListResponse = {
+  records: Contract[]
+  total: number
+  /** 全量合同金额合计(不受分页影响) */
+  totalAmountSum: number
+  /** 全量已收款合计(不受分页影响) */
+  totalPaidSum: number
+}
+
+export type ContractDimensionAggregate = {
+  /** 分组键(year 是数字字符串、bu 是字符串) */
+  dimension: string
+  count: number
+  totalAmount: number
+  totalPaid: number
+}
+
 export const contractApi = {
-  list(query: ContractListQuery = {}): Promise<Contract[]> {
-    return get<Contract[]>('/contracts', query)
+  list(query: ContractListQuery = {}): Promise<ContractListResponse> {
+    return get<ContractListResponse>('/contracts', {
+      page: query.page || 1,
+      size: query.size || 10,
+      keyword: query.keyword,
+      customerName: query.customerName,
+      status: query.status,
+      year: query.year,
+      bu: query.bu,
+    })
   },
   detail(id: number): Promise<ContractDetail> {
     return get<ContractDetail>(`/contracts/${id}`)
@@ -83,11 +122,27 @@ export const contractApi = {
   setDelivery(id: number, deliveryTime: string): Promise<string> {
     return put<string>(`/contracts/${id}/delivery`, { deliveryTime })
   },
-  inFlight(year?: number, bu?: string): Promise<Contract[]> {
-    return get<Contract[]>('/contracts/in-flight', { year, bu })
+  inFlight(query: ContractTopicQuery = {}): Promise<ContractTopicListResponse> {
+    return get<ContractTopicListResponse>('/contracts/in-flight', {
+      page: query.page || 1,
+      size: query.size || 10,
+      year: query.year,
+      bu: query.bu,
+    })
   },
-  accepted(year?: number, bu?: string): Promise<Contract[]> {
-    return get<Contract[]>('/contracts/accepted', { year, bu })
+  accepted(query: ContractTopicQuery = {}): Promise<ContractTopicListResponse> {
+    return get<ContractTopicListResponse>('/contracts/accepted', {
+      page: query.page || 1,
+      size: query.size || 10,
+      year: query.year,
+      bu: query.bu,
+    })
+  },
+  acceptedByYear(bu?: string): Promise<ContractDimensionAggregate[]> {
+    return get<ContractDimensionAggregate[]>('/contracts/accepted/by-year', { bu })
+  },
+  inFlightByBu(year?: number): Promise<ContractDimensionAggregate[]> {
+    return get<ContractDimensionAggregate[]>('/contracts/in-flight/by-bu', { year })
   },
   markPaymentPaid(paymentId: number, actualAmount: number, payTime?: string): Promise<string> {
     return put<string>(`/contract-payments/${paymentId}/pay`, { actualAmount, payTime })

@@ -111,3 +111,32 @@ export async function del<T>(path: string): Promise<T> {
   })
   return handleResponse<T>(res)
 }
+
+/**
+ * 文件上传(multipart/form-data)— 自动注入 token,同样走 handleResponse,
+ * 与 get/post 共享 401/403 自动跳登录与 Result<T> 解包逻辑。
+ * 注意:不要手动设置 Content-Type,让浏览器附带 boundary。
+ */
+export async function upload<T>(
+  path: string,
+  file: File,
+  extra?: Record<string, string>,
+): Promise<T> {
+  const fd = new FormData()
+  fd.append('file', file)
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) {
+      if (v !== undefined && v !== null) fd.append(k, v)
+    }
+  }
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers,
+    body: fd,
+  })
+  return handleResponse<T>(res)
+}

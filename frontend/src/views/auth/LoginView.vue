@@ -49,7 +49,7 @@
             :loading="authState.loading"
             @click="doLogin"
           >
-            <span class="btn-text">{{ authState.loading ? '登录中...' : '登 录' }}</span>
+            <span class="btn-text">{{ authState.loading ? '登录中...' : '登录' }}</span>
           </el-button>
         </el-form-item>
       </el-form>
@@ -62,8 +62,8 @@
         </span>
       </div>
 
-      <!-- 种子账号(可折叠) -->
-      <el-collapse v-model="seedOpen" class="seed-collapse">
+      <!-- 种子账号(仅 DEV 模式可见) -->
+      <el-collapse v-if="isDev" v-model="seedOpen" class="seed-collapse">
         <el-collapse-item name="seed">
           <template #title>
             <span class="seed-title">种子账号(点击展开)</span>
@@ -117,6 +117,7 @@ export default defineComponent({
     const message = ref('')
     const seedOpen = ref<string[]>([])
     const seedAccounts = SEED_ACCOUNTS
+    const isDev = import.meta.env.DEV
 
     const explicitRedirect = computed(() => {
       const r = route.query.redirect
@@ -155,6 +156,7 @@ export default defineComponent({
       message,
       seedOpen,
       seedAccounts,
+      isDev,
       doLogin,
       User,
       Lock,
@@ -172,25 +174,20 @@ export default defineComponent({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%);
-  padding: 24px;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--color-bg-soft);
+  padding: var(--space-6);
+  font-family: var(--font-sans);
 }
 
-/* ---------- 卡片 ---------- */
+/* ---------- 卡片(border + shadow 二选一,这里选 shadow) ---------- */
 
 .login-card {
   width: 440px;
   max-width: 100%;
-  padding: 36px 32px 28px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow:
-    0 20px 50px -12px rgba(15, 23, 42, 0.12),
-    0 4px 12px rgba(15, 23, 42, 0.04);
+  padding: var(--space-8);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-2);
 }
 
 /* ---------- 品牌区 ---------- */
@@ -198,16 +195,16 @@ export default defineComponent({
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 28px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
 }
 
 .brand-logo {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  background: #0369a1;
-  color: #ffffff;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -215,95 +212,91 @@ export default defineComponent({
 }
 
 .brand-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: #0f172a;
-  line-height: 1.3;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  line-height: var(--leading-tight);
 }
 
 /* ---------- 主标题区 ---------- */
 
-.title-block {
-  margin-bottom: 0;
-}
-
 .title {
-  font-size: 22px;
-  font-weight: 600;
-  color: #0f172a;
-  margin: 0 0 6px;
-  line-height: 1.3;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-2);
+  line-height: var(--leading-tight);
 }
 
 .subtitle {
-  font-size: 13px;
-  color: #64748b;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
   margin: 0;
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .divider {
   height: 1px;
-  background: #e2e8f0;
-  margin: 20px 0;
+  background: var(--color-border);
+  margin: var(--space-6) 0;
 }
 
 /* ---------- 表单 ---------- */
 
 .login-form {
   :deep(.el-form-item) {
-    margin-bottom: 18px;
+    margin-bottom: var(--space-4);
   }
 
   :deep(.el-form-item__label) {
-    line-height: 1.4;
-    padding: 0 0 6px;
+    line-height: var(--leading-tight);
+    padding: 0 0 var(--space-2);
   }
 
   .form-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: #475569;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--color-text-secondary);
   }
 
   :deep(.el-input__wrapper) {
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
     box-shadow: none;
-    transition: border-color 200ms ease, box-shadow 200ms ease;
-    padding: 1px 11px;
+    transition: border-color var(--duration-base) var(--easing);
+    padding: 1px 12px;
   }
 
   :deep(.el-input__wrapper:hover) {
-    border-color: #cbd5e1;
+    border-color: var(--color-border-strong);
   }
 
   :deep(.el-input__wrapper.is-focus) {
-    border-color: #0369a1;
+    border-color: var(--color-primary);
     box-shadow: 0 0 0 3px rgba(3, 105, 161, 0.12);
   }
 
   :deep(.el-input__inner) {
-    height: 40px;
-    color: #0f172a;
-    font-size: 14px;
+    height: var(--form-control-height);
+    color: var(--color-text-primary);
+    font-size: var(--text-sm);
   }
 
   :deep(.el-input__prefix-inner .el-icon) {
-    color: #94a3b8;
-    font-size: 16px;
-    transition: color 200ms ease;
+    color: var(--color-text-disabled);
+    font-size: var(--text-base);
+    transition: color var(--duration-base) var(--easing);
   }
 
   :deep(.el-input__wrapper.is-focus .el-input__prefix-inner .el-icon) {
-    color: #0369a1;
+    color: var(--color-primary);
   }
 }
 
-/* ---------- 主按钮 ---------- */
+/* ---------- 主按钮(纯色,hover 仅 darken) ---------- */
 
 .submit-item {
-  margin-top: 24px !important;
+  margin-top: var(--space-6) !important;
   margin-bottom: 0 !important;
 
   :deep(.el-form-item__content) {
@@ -313,36 +306,35 @@ export default defineComponent({
 
 .login-btn {
   width: 100%;
-  height: 44px;
-  border-radius: 8px;
-  background: #0369a1;
-  border-color: #0369a1;
-  font-weight: 600;
+  height: var(--button-height-lg);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  font-weight: var(--weight-semibold);
   letter-spacing: 0.5px;
-  transition: background 200ms ease, box-shadow 200ms ease;
+  transition: background var(--duration-base) var(--easing);
 
   &:hover,
   &:focus {
-    background: #0284c7;
-    border-color: #0284c7;
-    box-shadow: 0 4px 12px rgba(3, 105, 161, 0.25);
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
   }
 
   &:active {
-    background: #075985;
-    border-color: #075985;
+    background: var(--color-primary-active);
+    border-color: var(--color-primary-active);
   }
 
   .btn-text {
-    font-size: 15px;
+    font-size: var(--text-base);
   }
 }
 
 /* ---------- 错误提示 ---------- */
 
 .error-slot {
-  min-height: 22px;
-  padding-top: 8px;
+  min-height: 24px;
+  padding-top: var(--space-2);
   display: flex;
   align-items: center;
 }
@@ -350,35 +342,35 @@ export default defineComponent({
 .error-text {
   display: inline-flex;
   align-items: center;
-  font-size: 13px;
-  font-weight: 500;
-  color: #dc2626;
-  line-height: 1.4;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-error);
+  line-height: var(--leading-tight);
 }
 
 .error-icon {
-  font-size: 14px;
-  margin-right: 6px;
-  color: #dc2626;
+  font-size: var(--text-sm);
+  margin-right: var(--space-2);
+  color: var(--color-error);
 }
 
-/* ---------- 种子账号 ---------- */
+/* ---------- 种子账号(仅 DEV) ---------- */
 
 .seed-collapse {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   border: none;
 
   :deep(.el-collapse-item__header) {
     height: 32px;
     line-height: 32px;
-    font-size: 12px;
-    color: #94a3b8;
+    font-size: var(--text-xs);
+    color: var(--color-text-disabled);
     border: none;
     background: transparent;
   }
 
   :deep(.el-collapse-item__header.is-active) {
-    color: #475569;
+    color: var(--color-text-secondary);
   }
 
   :deep(.el-collapse-item__wrap) {
@@ -392,57 +384,57 @@ export default defineComponent({
 }
 
 .seed-title {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: inherit;
 }
 
 .seed-list {
-  margin-top: 4px;
-  background: #f8fafc;
-  border-radius: 6px;
-  padding: 12px;
+  margin-top: var(--space-1);
+  background: var(--color-bg-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .seed-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #475569;
-  font-family: 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
 }
 
 .seed-username {
   min-width: 84px;
-  color: #0f172a;
-  font-weight: 500;
+  color: var(--color-text-primary);
+  font-weight: var(--weight-medium);
 }
 
 .seed-sep {
-  color: #cbd5e1;
+  color: var(--color-border-strong);
 }
 
 .seed-pwd {
   min-width: 60px;
-  color: #64748b;
+  color: var(--color-text-tertiary);
 }
 
 .seed-role {
   margin-left: auto;
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 11px;
-  color: #94a3b8;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--color-text-disabled);
 }
 
 /* ---------- 页脚 ---------- */
 
 .footer {
-  margin-top: 32px;
-  font-size: 12px;
-  color: #94a3b8;
+  margin-top: var(--space-8);
+  font-size: var(--text-xs);
+  color: var(--color-text-disabled);
   text-align: center;
 }
 </style>

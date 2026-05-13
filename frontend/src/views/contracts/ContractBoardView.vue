@@ -71,7 +71,7 @@
             <div
               v-for="c in completed"
               :key="c.id"
-              class="contract-item completed"
+              class="contract-item contract-item--completed"
               @click="goPreview(c.id)"
             >
               <div class="contract-name">{{ c.contractName }}</div>
@@ -122,9 +122,12 @@ export default defineComponent({
     const reload = async () => {
       loading.value = true
       try {
-        allContracts.value = await contractApi.list({
+        const res = await contractApi.list({
+          page: 1,
+          size: 200,
           year: selectedYear.value === 0 ? undefined : selectedYear.value,
         })
+        allContracts.value = res.records || []
       } catch (e: any) {
         ElMessage.error(e?.message || '加载失败')
         allContracts.value = []
@@ -158,47 +161,133 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.page { max-width: 1400px; margin: 0 auto; }
-.page-header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 16px;
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
 }
-.page-title { font-size: 18px; font-weight: 600; color: #0F172A; margin: 0; }
-.header-actions { display: flex; gap: 12px; }
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.page-title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--space-3);
+}
 
 .filter-card {
-  border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 16px;
-  :deep(.el-card__body) { padding: 12px 20px; }
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  margin-bottom: var(--space-4);
+
+  :deep(.el-card__body) {
+    padding: var(--space-3) var(--space-6);
+  }
 }
-.year-row { display: flex; align-items: center; gap: 12px; }
-.year-label { font-size: 13px; color: #475569; }
+
+.year-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.year-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
 
 .board-card {
-  border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 16px;
-  :deep(.el-card__header) {
-    padding: 14px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;
-  }
-  :deep(.el-card__body) { padding: 12px 20px; min-height: 280px; }
-}
-.card-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; color: #0F172A; }
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  margin-bottom: var(--space-4);
 
-.contract-list { display: flex; flex-direction: column; gap: 12px; }
+  :deep(.el-card__header) {
+    padding: var(--space-3) var(--space-6);
+    background: var(--color-bg-soft);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  :deep(.el-card__body) {
+    padding: var(--space-3) var(--space-6);
+    min-height: 280px;
+  }
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+.contract-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* 内项卡:仅 border,不叠加 shadow,hover 仅改边框色 */
 .contract-item {
-  border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 16px;
-  cursor: pointer; transition: all 0.15s; background: #FFFFFF;
-  &:hover { border-color: #0369A1; box-shadow: 0 1px 4px rgba(3, 105, 161, 0.1); }
-  &.completed { opacity: 0.85; }
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  background: var(--color-bg);
+  transition: border-color var(--duration-fast) var(--easing),
+              background var(--duration-fast) var(--easing);
+
+  &:hover {
+    border-color: var(--color-primary);
+    background: var(--color-bg-soft);
+  }
+
+  &--completed {
+    opacity: 0.85;
+  }
 }
-.contract-name { font-weight: 600; font-size: 14px; color: #0F172A; margin-bottom: 6px; }
+
+.contract-name {
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
 .contract-meta {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-  font-size: 12px; color: #64748B; margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-2);
 }
-.meta-sep { color: #CBD5E1; }
-.amount { font-family: 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; color: #0369A1; }
-.paid-meta { font-size: 12px; color: #475569; margin-top: 4px; }
-:deep(.el-button--primary) {
-  background-color: #0369A1; border-color: #0369A1;
-  &:hover { background-color: #0284C7; border-color: #0284C7; }
+
+.meta-sep {
+  color: var(--color-border-strong);
+}
+
+.amount {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  color: var(--color-primary);
+}
+
+.paid-meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
 }
 </style>

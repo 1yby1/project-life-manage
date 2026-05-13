@@ -1,13 +1,18 @@
 package org.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.backend.mapper.ContractMapper;
 import org.backend.mapper.ContractPaymentMapper;
 import org.backend.model.CrmContract;
 import org.backend.model.CrmContractPayment;
+import org.backend.model.Dto.PageResult;
 import org.backend.model.Dto.contract.ContractCreateRequest;
 import org.backend.model.Dto.contract.ContractDetailDto;
+import org.backend.model.Dto.contract.ContractDimensionAggregate;
 import org.backend.model.Dto.contract.ContractListItemDto;
+import org.backend.model.Dto.contract.ContractTopicPageResult;
 import org.backend.model.Dto.contract.PaymentNodeRequest;
 import org.backend.service.ContractService;
 import org.springframework.beans.BeanUtils;
@@ -29,8 +34,10 @@ public class ContractServiceImpl implements ContractService {
     private ContractPaymentMapper paymentMapper;
 
     @Override
-    public List<ContractListItemDto> list(String keyword, String customerName, String status, Integer year, String bu) {
-        return contractMapper.selectListWithJoins(null, keyword, customerName, status, year, bu);
+    public PageResult<ContractListItemDto> list(long page, long size, String keyword, String customerName, String status, Integer year, String bu) {
+        Page<ContractListItemDto> p = new Page<>(page, size);
+        IPage<ContractListItemDto> result = contractMapper.selectPageWithJoins(p, keyword, customerName, status, year, bu);
+        return new PageResult<>(result.getTotal(), result.getRecords());
     }
 
     @Override
@@ -168,12 +175,39 @@ public class ContractServiceImpl implements ContractService {
     }
 
     @Override
-    public List<ContractListItemDto> listInFlight(Integer year, String bu) {
-        return contractMapper.selectListWithJoins(null, null, null, "EXECUTING", year, bu);
+    public ContractTopicPageResult listInFlight(long page, long size, Integer year, String bu) {
+        return listTopic(page, size, "EXECUTING", year, bu);
     }
 
     @Override
-    public List<ContractListItemDto> listAccepted(Integer year, String bu) {
-        return contractMapper.selectListWithJoins(null, null, null, "COMPLETED", year, bu);
+    public ContractTopicPageResult listAccepted(long page, long size, Integer year, String bu) {
+        return listTopic(page, size, "COMPLETED", year, bu);
+    }
+
+    /** 专题分页 + 全量金额汇总(in-flight / accepted 共用) */
+    private ContractTopicPageResult listTopic(long page, long size, String status, Integer year, String bu) {
+        Page<ContractListItemDto> p = new Page<>(page, size);
+        IPage<ContractListItemDto> result = contractMapper.selectPageWithJoins(p, null, null, status, year, bu);
+        java.util.Map<String, Object> agg = contractMapper.selectTopicAggregates(status, year, bu);
+        BigDecimal totalAmountSum = toBigDecimal(agg == null ? null : agg.get("totalAmountSum"));
+        BigDecimal totalPaidSum = toBigDecimal(agg == null ? null : agg.get("totalPaidSum"));
+        return new ContractTopicPageResult(result.getTotal(), result.getRecords(), totalAmountSum, totalPaidSum);
+    }
+
+    private static BigDecimal toBigDecimal(Object v) {
+        if (v == null) return BigDecimal.ZERO;
+        if (v instanceof BigDecimal bd) return bd;
+        if (v instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        return new BigDecimal(v.toString());
+    }
+
+    @Override
+    public List<ContractDimensionAggregate> acceptedAggregateByYear(String bu) {
+        return contractMapper.aggregateByYear("COMPLETED", bu);
+    }
+
+    @Override
+    public List<ContractDimensionAggregate> inFlightAggregateByBu(Integer year) {
+        return contractMapper.aggregateByBu("EXECUTING", year);
     }
 }

@@ -1,0 +1,90 @@
+/* =========================================================================
+ * Design Tokens — CLAUDE.md Compliant
+ * 所有页面共用,通过 CSS 自定义属性引用:`color: var(--color-text-primary)`
+ * 一切硬编码颜色 / 字号 / 间距必须改用 token,违反 CLAUDE.md 设计规范
+ * ========================================================================= */
+
+:root {
+  /* ---------- 品牌色 ---------- */
+  --color-primary:         #0369A1;
+  --color-primary-hover:   #0284C7;
+  --color-primary-active:  #075985;
+
+  /* 浅色 / 信息背景 */
+  --color-primary-soft:    #E0F2FE;
+  --color-primary-bg:      #F0F9FF;
+  --color-primary-border:  #BAE6FD;
+
+  /* ---------- 语义色 ---------- */
+  --color-success:         #059669;
+  --color-warning:         #D97706;
+  --color-error:           #DC2626;
+  --color-info:            var(--color-primary);
+
+  /* ---------- 中性色(slate scale,与现有代码对齐) ---------- */
+  --color-bg:              #FFFFFF;
+  --color-bg-soft:         #F8FAFC;
+  --color-bg-muted:        #F3F4F6;
+
+  --color-border:          #E2E8F0;
+  --color-border-strong:   #CBD5E1;
+
+  --color-text-primary:    #0F172A;
+  --color-text-secondary:  #475569;
+  --color-text-tertiary:   #64748B;
+  --color-text-disabled:   #94A3B8;
+  --color-text-on-primary: #FFFFFF;
+
+  /* ---------- 字号 scale(CLAUDE.md: 12/14/16/20/24/32 ONLY) ---------- */
+  --text-xs:   12px;
+  --text-sm:   14px;
+  --text-base: 16px;
+  --text-lg:   20px;
+  --text-xl:   24px;
+  --text-2xl:  32px;
+
+  /* 字体 */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI',
+               'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* 行高 */
+  --leading-tight:   1.25;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.75;
+
+  /* 字重 */
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ---------- 间距 (4px grid,CLAUDE.md: 4/8/12/16/24/32/48/64 ONLY) ---------- */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---------- 圆角(CLAUDE.md: 6 或 8,no 16px+) ---------- */
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-full: 9999px;
+
+  /* ---------- 阴影(CLAUDE.md: 至多 2 个层级) ---------- */
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.10);
+
+  /* ---------- 过渡 ---------- */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --easing:        cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---------- 表单 / 表格通用尺寸 ---------- */
+  --form-control-height: 40px;
+  --button-height:       40px;
+  --button-height-lg:    44px;
+}
